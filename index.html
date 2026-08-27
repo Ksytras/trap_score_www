@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>PANEL SĘDZIEGO</title>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      background: #0b0b0b;
+      color: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    body {
+      overflow: hidden;
+    }
+    .wrap {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      padding: 0;
+    }
+    .card {
+      width: min(100%, 700px);
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: #121212;
+      display: flex;
+      flex-direction: column;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .topBar {
+      padding: 14px 16px 10px;
+      background: #171717;
+      box-shadow: 0 2px 10px rgba(0,0,0,.25);
+      z-index: 2;
+    }
+    .title {
+      font-size: 18px;
+      opacity: .75;
+      margin-bottom: 6px;
+    }
+    .name {
+      font-size: clamp(32px, 7vw, 52px);
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 6px;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .club {
+      font-size: clamp(16px, 3.8vw, 22px);
+      color: #bdbdbd;
+      margin-bottom: 8px;
+      overflow-wrap: anywhere;
+    }
+    .shot {
+      font-size: clamp(22px, 4.8vw, 30px);
+      font-weight: 800;
+      color: #9ad6ff;
+    }
+    .mainButtons {
+      flex: 1;
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 14px;
+      padding: 14px;
+      padding-bottom: 96px;
+      min-height: 0;
+    }
+    button {
+      width: 100%;
+      border: none;
+      border-radius: 22px;
+      font-weight: 900;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hit, .miss {
+      min-height: 220px;
+      font-size: clamp(44px, 10vw, 82px);
+      letter-spacing: 1px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+    }
+    .hit {
+      background: #1bb14c;
+      color: #fff;
+    }
+    .miss {
+      background: #d54242;
+      color: #fff;
+    }
+    .bottomBar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 0 14px max(14px, env(safe-area-inset-bottom));
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      background: #121212;
+      z-index: 3;
+    }
+    .menuBtn {
+      background: #2f2f2f;
+      color: #fff;
+      min-height: 68px;
+      font-size: clamp(20px, 4.5vw, 28px);
+      border-radius: 18px;
+    }
+    .status {
+      min-height: 28px;
+      padding: 0 16px 84px;
+      color: #ddd;
+      font-size: clamp(14px, 3vw, 16px);
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+    .status-ok {
+      color: #7CFC00;
+    }
+    .status-warn {
+      color: #ffd966;
+    }
+    .status-error {
+      color: #ff7b7b;
+    }
+    .shotFlash {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 25;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      background: rgba(0,0,0,.15);
+    }
+    .shotFlash.show {
+      display: flex;
+    }
+    .shotFlashText {
+      font-size: clamp(42px, 11vw, 86px);
+      font-weight: 900;
+      color: #ffd966;
+      text-shadow: 0 4px 16px rgba(0,0,0,.65);
+      letter-spacing: 2px;
+    }
+    .roundFinish {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(10,10,10,.96);
+      z-index: 30;
+      text-align: center;
+      padding: 28px 18px;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      cursor: pointer;
+    }
+    .roundFinish.show {
+      display: flex;
+    }
+    .finishTitle {
+      font-size: clamp(36px, 10vw, 64px);
+      font-weight: 900;
+      color: #ffd966;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+    .finishSubtitle {
+      font-size: clamp(22px, 5vw, 30px);
+      color: #9ad6ff;
+      margin-bottom: 12px;
+    }
+    .finishMessage {
+      font-size: clamp(18px, 4vw, 26px);
+      margin-bottom: 22px;
+      line-height: 1.4;
+      max-width: 90%;
+    }
+    .finishTouch {
+      font-size: clamp(16px, 4vw, 24px);
+      font-weight: 800;
+      color: #7CFC00;
+      animation: blink 1.2s infinite;
+    }
+    .menuOverlay, .setupOverlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.55);
+      z-index: 40;
+      display: none;
+    }
+    .menuOverlay.show, .setupOverlay.show {
+      display: block;
+    }
+    .menuPanel, .setupPanel {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #1b1b1b;
+      border-top-left-radius: 26px;
+      border-top-right-radius: 26px;
+      padding: 18px 14px max(18px, env(safe-area-inset-bottom));
+      box-shadow: 0 -10px 30px rgba(0,0,0,.45);
+      transform: translateY(105%);
+      transition: transform .22s ease;
+    }
+    .menuOverlay.show .menuPanel, .setupOverlay.show .setupPanel {
+      transform: translateY(0);
+    }
+    .menuTitle, .setupTitle {
+      font-size: clamp(24px, 5vw, 32px);
+      font-weight: 900;
+      margin-bottom: 14px;
+      color: #ffd966;
+    }
+    .menuButtons, .setupButtons {
+      display: grid;
+      gap: 12px;
+    }
+    .menuAction, .setupAction {
+      min-height: 68px;
+      border-radius: 18px;
+      font-size: clamp(18px, 4.2vw, 24px);
+      color: #fff;
+      background: #3e3e3e;
+    }
+    .menuAction.warn {
+      background: #7b5b00;
+    }
+    .menuAction.danger, .setupAction.danger {
+      background: #8b2d2d;
+    }
+    .menuAction.saveRound {
+      background: #1b7f3a;
+    }
+    .menuAction.close, .setupAction.close {
+      background: #2d5a88;
+    }
+    .setupAction.save {
+      background: #1b7f3a;
+    }
+    .setupContent {
+      max-height: 70vh;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .setupRowTop {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 14px;
+    }
+    .field {
+      text-align: left;
+    }
+    .field label {
+      display: block;
+      font-size: 14px;
+      color: #ccc;
+      margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      min-height: 52px;
+      border: none;
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 18px;
+      background: #2a2a2a;
+      color: #fff;
+    }
+    .setupList {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .setupShooterRow {
+      background: #232323;
+      border-radius: 16px;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .setupShooterHeader {
+      font-weight: 800;
+      color: #9ad6ff;
+      text-align: left;
+    }
+    .setupHint {
+      font-size: 14px;
+      color: #bbb;
+      text-align: left;
+      margin-bottom: 10px;
+    }
+    button:active {
+      transform: scale(.985);
+    }
+    button:disabled {
+      opacity: .55;
+      cursor: default;
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .35; }
+    }
+    @media (orientation: landscape) {
+      .card {
+        width: min(100%, 1100px);
+      }
+      .topBar {
+        padding: 10px 16px 8px;
+      }
+      .mainButtons {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr;
+      }
+      .hit, .miss {
+        min-height: 0;
+        height: 100%;
+        font-size: clamp(42px, 6vw, 76px);
+      }
+    }
+    @media (max-height: 560px) {
+      .hit, .miss {
+        min-height: 140px;
+      }
+      .menuBtn, .menuAction, .setupAction {
+        min-height: 54px;
+      }
+      .field input {
+        min-height: 44px;
+      }
+    }
+    .numberControl {
+      display: grid;
+      grid-template-columns: 58px minmax(70px, 1fr) 58px;
+      gap: 6px;
+      align-items: stretch;
+    }
+    .numberControl .numberButton {
+      min-height: 52px;
+      border-radius: 14px;
+      background: #3e3e3e;
+      color: #fff;
+      font-size: 32px;
+      font-weight: 900;
+      line-height: 1;
+    }
+    .numberControl input {
+      width: 100%;
+      min-height: 52px;
+      border: none;
+      border-radius: 14px;
+      padding: 10px 8px;
+      font-size: 22px;
+      font-weight: 900;
+      text-align: center;
+      background: #2a2a2a;
+      color: #fff;
+    }
+    .numberControl input::-webkit-inner-spin-button,
+    .numberControl input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .numberControl input[type="number"] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="topBar">
+        <div class="title">PANEL SĘDZIEGO</div>
+        <div id="name" class="name"></div>
+        <div id="club" class="club"></div>
+        <div id="shot" class="shot"></div>
+      </div>
+
+      <div id="buttons" class="mainButtons" style="display:none;">
+        <button id="hitBtn" class="hit" onclick="sendShot('hit')">TRAFIONY</button>
+        <button id="missBtn" class="miss" onclick="sendShot('miss')">PUDŁO</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <div class="bottomBar">
+        <button class="menuBtn" onclick="openMenu()">MENU SĘDZIEGO</button>
+      </div>
+
+      <div id="shotFlash" class="shotFlash">
+        <div id="shotFlashText" class="shotFlashText"></div>
+      </div>
+
+      <div id="roundFinish" class="roundFinish" onclick="this.classList.remove('show'); openMenu();">
+        <div class="finishTitle">RUNDA ZAKOŃCZONA</div>
+        <div class="finishSubtitle">TRAP 25</div>
+        <div id="finishMessage" class="finishMessage"></div>
+        <div class="finishTouch">DOTKNIJ EKRAN ABY WRÓCIĆ</div>
+      </div>
+
+      <div id="menuOverlay" class="menuOverlay" onclick="closeMenu(event)">
+        <div class="menuPanel" onclick="event.stopPropagation()">
+          <div class="menuTitle">MENU SĘDZIEGO</div>
+          <div class="menuButtons">
+            <button class="menuAction danger" onclick="newGame()">NOWA RUNDA</button>
+            <button class="menuAction warn" onclick="openRestoreFiles()">PRZYWRÓĆ RUNDĘ</button>
+            <button class="menuAction" onclick="restorePoint()">COFNIJ OSTATNI STRZAŁ</button>
+            <button class="menuAction saveRound" onclick="saveGame()">ZAPISZ RUNDĘ</button>
+            <button class="menuAction close" onclick="closeMenu()">ZAMKNIJ</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="setupOverlay" class="setupOverlay" onclick="closeSetup(event)">
+        <div class="setupPanel" onclick="event.stopPropagation()">
+          <div class="setupTitle">NOWA RUNDA</div>
+          <div class="setupContent">
+            <div class="setupRowTop">
+              <div class="field">
+                <label for="shooterCount">Liczba zawodników</label>
+                <div class="numberControl">
+                  <button type="button" class="numberButton" onclick="changeShooterCount(-1)" aria-label="Zmniejsz liczbę zawodników">−</button>
+                  <input id="shooterCount" type="number" min="1" max="200" value="1" inputmode="numeric" oninput="refreshShooterForm(false)" onblur="refreshShooterForm(true)">
+                  <button type="button" class="numberButton" onclick="changeShooterCount(1)" aria-label="Zwiększ liczbę zawodników">+</button>
+                </div>
+              </div>
+              <button class="setupAction" type="button" onclick="reloadShooterFormFromSheet()">ODŚWIEŻ LISTĘ</button>
+            </div>
+
+            <div class="setupHint">
+              Wpisz nazwę zawodnika. Klub może być pusty.
+            </div>
+
+            <div id="setupList" class="setupList"></div>
+          </div>
+
+          <div class="setupButtons">
+            <button class="setupAction save" type="button" onclick="saveNewRoundWithShooters()">ZAPISZ I ROZPOCZNIJ</button>
+            <button class="setupAction close" type="button" onclick="closeSetup()">ANULUJ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+	<script src="js/config.js"></script>
+	<script src="js/common.js"></script>
+	<script src="js/menu.js"></script>
+	<script src="js/new_game.js"></script>
+	<script src="js/save_game.js"></script>
+	<script src="js/score.js"></script>
+	<script src="js/sendshot.js"></script>
+	<script src="js/display.js"></script>
+	<script src="js/restore_point.js"></script>
+	<script src="js/restore_score.js"></script>
+	<script src="js/file_list.js"></script>
+</body>
+</html>
