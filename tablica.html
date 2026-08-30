@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>TeGeS — Tablica Wyników Trap</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#000000;
+    --row-bg:#0c0c0c;
+    --row-bg-alt:#111111;
+    --grid-line:#2a2a2a;
+    --text:#f2f2f2;
+    --text-dim:#9a9a9a;
+    --gold:#e8c34a;
+    --silver:#c9c9c9;
+    --bronze:#d98a3d;
+    --hit:#3ecb5e;
+    --miss:#e24a4a;
+    --empty-ring:#3a3a3a;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0;
+    padding:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Segoe UI", Roboto, Arial, sans-serif;
+  }
+
+  .page{
+    max-width:1760px;
+    margin:0 auto;
+    padding:clamp(14px,2vw,28px) clamp(10px,2vw,24px) 60px;
+  }
+
+  .header{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:clamp(12px,2vw,24px);
+    margin-bottom:clamp(16px,2.5vw,28px);
+  }
+
+  .header img.logo-round{
+    height:clamp(64px,7vw,96px);
+    width:clamp(64px,7vw,96px);
+    border-radius:50%;
+    flex-shrink:0;
+  }
+
+  .header img.logo-rect{
+    height:clamp(90px,11vw,150px);
+    width:auto;
+    border-radius:4px;
+    flex-shrink:0;
+  }
+
+  .header .title{
+    margin-left:auto;
+    text-align:right;
+  }
+
+  .header .title h1{
+    margin:0;
+    font-size:clamp(16px,2vw,22px);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--text);
+  }
+
+  .header .title .sub{
+    margin-top:4px;
+    font-size:11px;
+    color:var(--text-dim);
+  }
+
+  .status-dot{
+    display:inline-block;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--hit);
+    margin-right:6px;
+    animation:pulse 2s infinite;
+  }
+
+  @keyframes pulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.35; }
+  }
+
+  .table-wrap{
+    width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  table{
+    width:100%;
+    min-width:900px;
+    border-collapse:collapse;
+    table-layout:fixed;
+  }
+
+  col.col-pos{ width:48px; }
+  col.col-name{ width:150px; }
+  col.col-score{ width:78px; }
+  col.col-shot{ width:26px; }
+
+  thead th{
+    background:#000;
+    color:var(--text);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    font-weight:600;
+    padding:9px 4px;
+    border-bottom:2px solid var(--grid-line);
+    position:sticky;
+    top:0;
+    z-index:2;
+  }
+
+  /* Zamrożone kolumny: Pos. / Shooter Name / Score — przewija się tylko T1..T25 */
+  thead th:nth-child(1), tbody td:nth-child(1){ position:sticky; left:0; z-index:2; }
+  thead th:nth-child(2), tbody td:nth-child(2){ position:sticky; left:48px; z-index:2; }
+  thead th:nth-child(3), tbody td:nth-child(3){ position:sticky; left:198px; z-index:2; }
+
+  thead th:nth-child(1), thead th:nth-child(2), thead th:nth-child(3){ z-index:3; }
+
+  thead th:nth-child(3), tbody td:nth-child(3){
+    box-shadow:4px 0 6px -4px rgba(0,0,0,.7);
+  }
+
+  thead th.head-left{ text-align:left; padding-left:10px; }
+  thead th.head-center{ text-align:center; }
+  thead th.head-shot{ font-size:10px; padding:9px 2px; }
+
+  tbody td{
+    padding:7px 4px;
+    border-bottom:1px solid var(--grid-line);
+    font-size:13px;
+    text-align:center;
+    white-space:nowrap;
+  }
+
+  tbody td.cell-shot{
+    padding:5px 2px;
+  }
+
+  tbody td.cell-pos{
+    font-weight:800;
+    font-size:14px;
+  }
+
+  tbody td.cell-name{
+    text-align:left;
+    padding-left:10px;
+    font-weight:700;
+    letter-spacing:.01em;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  tbody td.cell-score{
+    font-weight:800;
+    font-size:14px;
+  }
+
+  /* Podium highlight — tylko na kolumnach Pos. / Shooter Name / Score */
+  tbody td.top-1{ background:var(--gold);   color:#111; }
+  tbody td.top-2{ background:var(--silver); color:#111; }
+  tbody td.top-3{ background:var(--bronze); color:#111; }
+
+  tbody td.top-1, tbody td.top-2, tbody td.top-3{
+    border-bottom:1px solid rgba(0,0,0,.25);
+  }
+
+  /* Naprzemienne tło — ustawiane bezpośrednio na komórkach,
+     bo kolumny Pos./Name/Score są "sticky" i potrzebują własnego,
+     nieprzezroczystego tła (nie mogą polegać na tle wiersza <tr>) */
+  tbody td.stripe-a{ background:var(--row-bg); }
+  tbody td.stripe-b{ background:var(--row-bg-alt); }
+
+  tr.row-normal:nth-child(odd) td.cell-shot{ background:var(--row-bg); }
+  tr.row-normal:nth-child(even) td.cell-shot{ background:var(--row-bg-alt); }
+
+  .dot{
+    display:inline-block;
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    vertical-align:middle;
+  }
+
+  .dot.hit{ background:var(--hit); box-shadow:0 0 4px rgba(62,203,94,.5); }
+  .dot.miss{ background:var(--miss); box-shadow:0 0 4px rgba(226,74,74,.5); }
+  .dot.pending{
+    background:transparent;
+    border:1.5px solid var(--empty-ring);
+  }
+
+  .empty-state{
+    padding:40px;
+    text-align:center;
+    color:var(--text-dim);
+    font-size:14px;
+  }
+
+  .footer-note{
+    margin-top:14px;
+    font-size:11px;
+    color:var(--text-dim);
+    text-align:right;
+  }
+
+  @media (max-width:640px){
+    .header{ justify-content:center; text-align:center; }
+    .header .title{ margin-left:0; text-align:center; width:100%; }
+    table{ min-width:760px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <div class="header">
+    <img class="logo-round" src="src/l_ksa.png" alt="Braterstwo EU">
+    <img class="logo-rect" src="src/l_tgs.png" alt="TeGeS">
+    <div class="title">
+      <h1>Tablica Wyników — Trap</h1>
+      <div class="sub"><span class="status-dot"></span>na żywo — aktualizacja co <span id="refreshSecs">3</span> s · ostatnia aktualizacja: <span id="lastUpdate">—</span></div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+  <table id="scoreboard">
+    <colgroup>
+      <col class="col-pos">
+      <col class="col-name">
+      <col class="col-score">
+      <!-- T1..T25 columns injected by JS -->
+    </colgroup>
+    <thead>
+      <tr id="headRow">
+        <th class="head-center">Pos.</th>
+        <th class="head-left">Shooter Name</th>
+        <th class="head-center">Score</th>
+        <!-- T1..T25 injected by JS -->
+      </tr>
+    </thead>
+    <tbody id="scoreBody">
+      <tr><td colspan="28" class="empty-state">Wczytywanie wyników…</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="footer-note">Dane: wyniki.json · odświeżanie automatyczne</div>
+
+</div>
+
+<script>
+(function(){
+
+  const DATA_URL = "wyniki.json";
+  const REFRESH_MS = 3000;      // 3 s — w zakresie 2-5 s
+  const MAX_TARGETS = 25;       // T1..T25
+  const MAX_ROWS = 200;         // limit wierszy
+
+  document.getElementById("refreshSecs").textContent = (REFRESH_MS/1000).toString();
+
+  // Build the T1..T25 header cells once
+  const headRow = document.getElementById("headRow");
+  const colgroup = document.querySelector("#scoreboard colgroup");
+  for(let i=1;i<=MAX_TARGETS;i++){
+    const th = document.createElement("th");
+    th.className = "head-center head-shot";
+    th.textContent = "T" + i;
+    headRow.appendChild(th);
+
+    const col = document.createElement("col");
+    col.className = "col-shot";
+    colgroup.appendChild(col);
+  }
+
+  function scoreOf(shots){
+    let s = 0;
+    for(const v of shots){ if(v === 1) s++; }
+    return s;
+  }
+
+  function shotsTakenOf(shots){
+    let n = 0;
+    for(const v of shots){ if(v === 1 || v === 0) n++; }
+    return n;
+  }
+
+  function dotHtml(v){
+    if(v === 1) return '<span class="dot hit"></span>';
+    if(v === 0) return '<span class="dot miss"></span>';
+    return '<span class="dot pending"></span>'; // null / brak strzału
+  }
+
+  function podiumClass(pos){
+    if(pos === 1) return " top-1";
+    if(pos === 2) return " top-2";
+    if(pos === 3) return " top-3";
+    return "";
+  }
+
+  function render(shooters){
+    const tbody = document.getElementById("scoreBody");
+
+    if(!Array.isArray(shooters) || shooters.length === 0){
+      tbody.innerHTML = '<tr><td colspan="' + (3+MAX_TARGETS) + '" class="empty-state">Brak danych zawodników.</td></tr>';
+      return;
+    }
+
+    // Klasyfikacja: malejąco wg liczby trafień; przy remisie rosnąco wg numeru zawodnika (niższy numer wyżej)
+    const ranked = shooters.slice().sort((a, b) => {
+      const sb = scoreOf(b.shots || []);
+      const sa = scoreOf(a.shots || []);
+      if(sb !== sa) return sb - sa;
+      return (a.shooterNumber || 0) - (b.shooterNumber || 0);
+    }).slice(0, MAX_ROWS);
+
+    let html = "";
+    ranked.forEach((shooter, idx) => {
+      const pos = idx + 1;
+      const shots = shooter.shots || [];
+      const score = scoreOf(shots);
+      const taken = shotsTakenOf(shots);
+
+      const podium = podiumClass(pos);
+      const stripe = podium ? "" : (idx % 2 === 0 ? " stripe-a" : " stripe-b");
+      const cellExtra = podium || stripe;
+
+      let rowHtml = '<tr class="row-normal">';
+      rowHtml += '<td class="cell-pos' + cellExtra + '">' + pos + '</td>';
+      rowHtml += '<td class="cell-name' + cellExtra + '">' + escapeHtml(shooter.shooterName || ("Strzelec_" + shooter.shooterNumber)) + '</td>';
+      rowHtml += '<td class="cell-score' + cellExtra + '">' + score + ' / ' + MAX_TARGETS + '</td>';
+
+      for(let i=0;i<MAX_TARGETS;i++){
+        const v = (i < shots.length) ? shots[i] : null;
+        rowHtml += '<td class="cell-shot">' + dotHtml(v) + '</td>';
+      }
+
+      rowHtml += '</tr>';
+      html += rowHtml;
+    });
+
+    tbody.innerHTML = html;
+  }
+
+  function escapeHtml(str){
+    return String(str)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;");
+  }
+
+  async function loadData(){
+    try{
+      const res = await fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" });
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      render(data);
+      document.getElementById("lastUpdate").textContent =
+        new Date().toLocaleTimeString("pl-PL");
+    }catch(err){
+      console.error("Błąd wczytywania wyniki.json:", err);
+      document.getElementById("lastUpdate").textContent = "błąd odczytu (" + new Date().toLocaleTimeString("pl-PL") + ")";
+    }
+  }
+
+  loadData();
+  setInterval(loadData, REFRESH_MS);
+
+})();
+</script>
+
+</body>
+</html>
