@@ -67,35 +67,4 @@ function closeMenu(event) {
     menuOverlay.classList.remove('show');
   }
 }
-
-
-/*
- * ============================================================
- * ZAMKNIĘCIE FORMULARZA NOWEJ RUNDY
- * ============================================================
- */
-
-function closeSetup(event) {
-
-  /*
-   * Kliknięcie w panel nie zamyka formularza.
-   *
-   * Kliknięcie w zaciemnione tło zamyka formularz.
-   */
-
-  if (
-    event &&
-    event.target !== event.currentTarget
-  ) {
-
-    return;
-  }
-
-  const overlay =
-    document.getElementById('setupOverlay');
-
-  if (overlay) {
-
-    overlay.classList.remove('show');
-  }
 }
