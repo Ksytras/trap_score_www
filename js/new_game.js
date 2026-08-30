@@ -337,37 +337,6 @@ function refreshShooterForm(
   }
 }
 
-
-/*
- * ============================================================
- * BEZPIECZNE KODOWANIE WARTOŚCI HTML
- * ============================================================
- */
-
-function escapeHtmlAttribute(value) {
-
-  return String(
-    value ?? ''
-  )
-  .replace(
-    /&/g,
-    '&amp;'
-  )
-  .replace(
-    /"/g,
-    '&quot;'
-  )
-  .replace(
-    /</g,
-    '&lt;'
-  )
-  .replace(
-    />/g,
-    '&gt;'
-  );
-}
-
-
 /*
  * ============================================================
  * ZMIANA LICZBY ZAWODNIKÓW
