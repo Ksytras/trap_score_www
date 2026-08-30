@@ -40,6 +40,20 @@
       position: relative;
       overflow: hidden;
     }
+
+    /*
+     * Główny kontener aplikacji.
+     * data-state jest przygotowany jako centralny kontrakt stanów aplikacji.
+     * Na tym etapie istniejące klasy/ID pozostają bez zmian, aby nie zerwać
+     * aktualnej logiki JavaScript. Kolejne pliki JS będą stopniowo przejmować
+     * sterowanie widocznością na podstawie data-state.
+     */
+    #app[data-state="ready"] {}
+    #app[data-state="judge-menu"] {}
+    #app[data-state="new-round"] {}
+    #app[data-state="shooting"] {}
+    #app[data-state="round-operations"] {}
+
     .topBar {
       padding: 14px 16px 10px;
       background: #171717;
@@ -389,7 +403,7 @@
 
 <body>
   <div class="wrap">
-    <div class="card">
+    <div id="app" class="card" data-state="ready">
       <div class="topBar">
         <div class="title">PANEL SĘDZIEGO</div>
         <div id="name" class="name"></div>
@@ -464,16 +478,16 @@
     </div>
   </div>
 
-	<script src="js/config.js"></script>
-	<script src="js/common.js"></script>
-	<script src="js/menu.js"></script>
-	<script src="js/new_game.js"></script>
-	<script src="js/save_game.js"></script>
-	<script src="js/score.js"></script>
-	<script src="js/sendshot.js"></script>
-	<script src="js/display.js"></script>
-	<script src="js/restore_point.js"></script>
-	<script src="js/restore_score.js"></script>
-	<script src="js/file_list.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/new_game.js"></script>
+  <script src="js/save_game.js"></script>
+  <script src="js/score.js"></script>
+  <script src="js/sendshot.js"></script>
+  <script src="js/display.js"></script>
+  <script src="js/restore_point.js"></script>
+  <script src="js/restore_score.js"></script>
+  <script src="js/file_list.js"></script>
 </body>
 </html>
