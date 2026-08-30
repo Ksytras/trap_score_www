@@ -67,4 +67,3 @@ function closeMenu(event) {
     menuOverlay.classList.remove('show');
   }
 }
-}
