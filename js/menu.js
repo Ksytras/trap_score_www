@@ -112,7 +112,7 @@ function setAppState(state) {
 
   if (buttons) {
 
-    buttons.style.display = 'none';
+    buttons.classList.remove('show-buttons');
   }
 
   /* Pokazujemy wyłącznie widok należący do nowego stanu. */
@@ -146,7 +146,7 @@ function setAppState(state) {
 
       if (buttons) {
 
-        buttons.style.display = 'grid';
+        buttons.classList.add('show-buttons');
       }
 
       break;

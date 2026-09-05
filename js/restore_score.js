@@ -125,22 +125,27 @@ async function restoreScore(filename) {
       return false;
     }
 
-    if (result.maxShot !== undefined) {
+    /*
+     * WAŻNE: maxShot MUSI być zawsze w odpowiedzi API.
+     * Jeśli go nie ma, zwracamy błąd.
+     */
+    if (typeof result.maxShot !== 'number') {
 
-      const returnedMaxShot = Number(result.maxShot);
-
-      if (
-        !Number.isInteger(returnedMaxShot) ||
-        returnedMaxShot < 1
-      ) {
-
-        throw new Error(
-          'Serwer zwrócił nieprawidłową liczbę strzałów.'
-        );
-      }
-
-      scoreState.maxShot = returnedMaxShot;
+      throw new Error(
+        'Serwer nie zwrócił poprawnej liczby strzałów (maxShot).'
+      );
     }
+
+    const returnedMaxShot = Number(result.maxShot);
+
+    if (!Number.isInteger(returnedMaxShot) || returnedMaxShot < 1) {
+
+      throw new Error(
+        'Serwer zwrócił nieprawidłową liczbę strzałów.'
+      );
+    }
+
+    scoreState.maxShot = returnedMaxShot;
 
     if (result.roundFinished === true) {
 

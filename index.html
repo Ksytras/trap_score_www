@@ -86,12 +86,15 @@
     }
     .mainButtons {
       flex: 1;
-      display: grid;
+      display: none;
       grid-template-rows: 1fr 1fr;
       gap: 14px;
       padding: 14px;
       padding-bottom: 96px;
       min-height: 0;
+    }
+    .mainButtons.show-buttons {
+      display: grid;
     }
     button {
       width: 100%;
@@ -411,7 +414,7 @@
         <div id="shot" class="shot"></div>
       </div>
 
-      <div id="buttons" class="mainButtons" style="display:none;">
+      <div id="buttons" class="mainButtons">
         <button id="hitBtn" class="hit" onclick="sendShot('hit')">TRAFIONY</button>
         <button id="missBtn" class="miss" onclick="sendShot('miss')">PUDŁO</button>
       </div>
