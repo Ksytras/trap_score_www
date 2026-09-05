@@ -1,18 +1,23 @@
 /*
  * ============================================================
- * SCORE - ZAPISYWANIE WYNIKÓW
+ * SCORE — STAN STRZELANIA I ZAKOŃCZENIE RUNDY
  * ============================================================
  *
  * Funkcje:
  *
  *   score()
- *   sendShot()
  *   showShotFlash()
  *   hideShotFlash()
  *   finishRound()
  *   sleep()
  *
- * MAX_SHOT jest pobierany z PHP.
+ * Kontrakt przejść obsługiwanych przez ten moduł:
+ *
+ * NEW_ROUND / ROUND_OPERATIONS -> SHOOTING — poprawny odczyt rundy,
+ * SHOOTING -> ROUND_OPERATIONS — zakończenie wszystkich strzałów.
+ *
+ * MAX_SHOT jest pobierany z PHP. Widocznością głównych widoków
+ * zarządza wyłącznie setAppState() z menu.js.
  *
  * ============================================================
  */
@@ -45,20 +50,15 @@ let scoreState = {
 
 async function score() {
 
-  /*
-   * Zmieniamy nagłówek tylko podczas score().
-   */
+  if (
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
 
-  const title =
-    document.querySelector('.title');
-
-  if (title) {
-
-    title.textContent =
-      'STRZELA';
-
+    throw new Error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
   }
-
 
   try {
 
@@ -161,24 +161,17 @@ async function score() {
     }
 
 
-    /*
-     * Pokazujemy przyciski TRAFIONY / PUDŁO.
-     */
+    const title =
+      document.querySelector('.title');
 
-    const buttons =
-      document.getElementById('buttons');
+    if (title) {
 
-    if (buttons) {
-
-      buttons.style.display =
-        'grid';
-
+      title.textContent =
+        'STRZELA';
     }
 
 
-    /*
-     * Wyświetlamy aktualnego zawodnika.
-     */
+    /* Wyświetlamy aktualnego zawodnika. */
 
     displayCurrentShooter(
 
@@ -194,6 +187,14 @@ async function score() {
      */
 
     showStatus('', '');
+
+
+    if (!setAppState(APP_STATES.SHOOTING)) {
+
+      throw new Error(
+        'Nie udało się uruchomić widoku strzelania.'
+      );
+    }
 
 
   } catch (error) {
@@ -213,351 +214,19 @@ async function score() {
 
     );
 
+
+    throw error;
+
   }
 
 }
 
 
 /*
- * ============================================================
- * STRZAŁ
- * ============================================================
- *
- * hit  = 1
- * miss = 0
- *
- * ============================================================
+ * Funkcja sendShot() znajduje się wyłącznie w sendshot.js.
+ * Rozdzielenie odpowiedzialności zapobiega nadpisywaniu globalnej funkcji
+ * zależnie od kolejności ładowania skryptów.
  */
-
-async function sendShot(result) {
-
-  /*
-   * Jeżeli trwa blokada,
-   * ignorujemy kolejne kliknięcie.
-   */
-
-  if (scoreState.locked) {
-
-    return;
-
-  }
-
-
-  /*
-   * Dopuszczalne wartości.
-   */
-
-  if (
-    result !== 'hit' &&
-    result !== 'miss'
-  ) {
-
-    return;
-
-  }
-
-
-  /*
-   * Natychmiastowa blokada.
-   */
-
-  scoreState.locked =
-    true;
-
-
-  /*
-   * Zapamiętujemy moment kliknięcia.
-   */
-
-  const shotStartTime =
-    Date.now();
-
-
-  /*
-   * Przyciski.
-   */
-
-  const hitBtn =
-    document.getElementById('hitBtn');
-
-
-  const missBtn =
-    document.getElementById('missBtn');
-
-
-  if (hitBtn) {
-
-    hitBtn.disabled =
-      true;
-
-  }
-
-
-  if (missBtn) {
-
-    missBtn.disabled =
-      true;
-
-  }
-
-
-  /*
-   * hit  -> 1
-   * miss -> 0
-   */
-
-  const shotValue =
-    result === 'hit'
-      ? 1
-      : 0;
-
-
-  /*
-   * Pokazujemy komunikat.
-   */
-
-  showShotFlash(result);
-
-
-  try {
-
-    /*
-     * Zapis wyniku.
-     */
-
-    const response =
-      await fetch(API_URL, {
-
-        method: 'POST',
-
-        headers: {
-          'Content-Type': 'application/json'
-        },
-
-        body: JSON.stringify({
-
-          action: 'score',
-
-          shooterNumber:
-            scoreState.shooterIndex + 1,
-
-          shotNumber:
-            scoreState.shotNumber,
-
-          value:
-            shotValue
-
-        })
-
-      });
-
-
-    const apiResult =
-      await response.json();
-
-
-    if (
-      !response.ok ||
-      !apiResult.success
-    ) {
-
-      throw new Error(
-
-        apiResult.message ||
-        'Nie udało się zapisać wyniku.'
-
-      );
-
-    }
-
-
-    /*
-     * Obliczamy czas od kliknięcia.
-     */
-
-    const elapsed =
-      Date.now() - shotStartTime;
-
-
-    /*
-     * Pozostały czas do pełnych 2 sekund.
-     */
-
-    const remainingTime =
-      Math.max(
-        0,
-        2000 - elapsed
-      );
-
-
-    /*
-     * Czekamy.
-     */
-
-    if (remainingTime > 0) {
-
-      await sleep(
-        remainingTime
-      );
-
-    }
-
-
-    /*
-     * Usuwamy TRAFIONY / PUDŁO.
-     */
-
-    hideShotFlash();
-
-
-    /*
-     * ========================================================
-     * KONIEC RUNDY
-     * ========================================================
-     */
-
-    if (
-      apiResult.roundFinished
-    ) {
-
-      /*
-       * Ustawiamy maxShot, jeżeli PHP zwróciło
-       * tę wartość również przy zapisie.
-       */
-
-      if (
-        apiResult.maxShot !== undefined
-      ) {
-
-        scoreState.maxShot =
-          Number(apiResult.maxShot);
-
-      }
-
-
-      finishRound();
-
-      return;
-
-    }
-
-
-    /*
-     * ========================================================
-     * NASTĘPNY STRZAŁ
-     * ========================================================
-     */
-
-    scoreState.shooterIndex =
-      apiResult.nextShooterIndex;
-
-
-    scoreState.shotNumber =
-      apiResult.nextShotNumber;
-
-
-    /*
-     * Jeżeli PHP zwróciło maxShot,
-     * aktualizujemy stan.
-     */
-
-    if (
-      apiResult.maxShot !== undefined
-    ) {
-
-      const returnedMaxShot =
-        Number(apiResult.maxShot);
-
-
-      if (
-        Number.isInteger(returnedMaxShot) &&
-        returnedMaxShot > 0
-      ) {
-
-        scoreState.maxShot =
-          returnedMaxShot;
-
-      }
-
-    }
-
-
-    /*
-     * Wyświetlamy następnego zawodnika.
-     */
-
-    if (
-      apiResult.nextShooter
-    ) {
-
-      displayCurrentShooter(
-        apiResult.nextShooter
-      );
-
-    } else {
-
-      /*
-       * Awaryjnie pobieramy stan.
-       */
-
-      await score();
-
-    }
-
-
-  } catch (error) {
-
-    console.error(
-      'Błąd sendShot():',
-      error
-    );
-
-
-    /*
-     * Usuwamy komunikat wyniku.
-     */
-
-    hideShotFlash();
-
-
-    showStatus(
-
-      error.message ||
-      'Nie udało się zapisać wyniku.',
-
-      'error'
-
-    );
-
-
-  } finally {
-
-    /*
-     * Odblokowanie przycisków.
-     */
-
-    scoreState.locked =
-      false;
-
-
-    if (hitBtn) {
-
-      hitBtn.disabled =
-        false;
-
-    }
-
-
-    if (missBtn) {
-
-      missBtn.disabled =
-        false;
-
-    }
-
-  }
-
-}
 
 
 /*
@@ -642,22 +311,6 @@ function finishRound() {
    */
 
   hideShotFlash();
-
-
-  /*
-   * Ukrywamy przyciski.
-   */
-
-  const buttons =
-    document.getElementById('buttons');
-
-
-  if (buttons) {
-
-    buttons.style.display =
-      'none';
-
-  }
 
 
   /*
@@ -765,10 +418,6 @@ function finishRound() {
   }
 
 
-  /*
-   * Pokazujemy ekran zakończenia.
-   */
-
   const roundFinish =
     document.getElementById(
       'roundFinish'
@@ -776,12 +425,6 @@ function finishRound() {
 
 
   if (roundFinish) {
-
-    roundFinish.classList.add(
-      'show'
-    );
-
-
     /*
      * Kliknięcie ekranu końcowego
      * otwiera MENU SĘDZIEGO.
@@ -789,41 +432,26 @@ function finishRound() {
 
     roundFinish.onclick =
       function () {
-
-        roundFinish.classList.remove(
-          'show'
-        );
-
-
-        /*
-         * MENU SĘDZIEGO.
-         */
-
         openMenu();
-
       };
-
   }
 
-}
+
+  if (
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
+
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
+
+    return false;
+  }
 
 
-/*
- * ============================================================
- * OPÓŹNIENIE
- * ============================================================
- */
-
-function sleep(milliseconds) {
-
-  return new Promise(
-
-    resolve =>
-      setTimeout(
-        resolve,
-        milliseconds
-      )
-
+  return setAppState(
+    APP_STATES.ROUND_OPERATIONS
   );
 
 }
