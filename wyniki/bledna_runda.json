@@ -1,0 +1,20 @@
+[
+    {
+        "shooterNumber": 1,
+        "shooterName": "1",
+        "clubName": "",
+        "shots": [1, null, null, null, null]
+    },
+    {
+        "shooterNumber": 2,
+        "shooterName": "2",
+        "clubName": "",
+        "shots": [0, 1, null, null, null]
+    },
+    {
+        "shooterNumber": 3,
+        "shooterName": "3",
+        "clubName": "",
+        "shots": [1, null, null, null, null]
+    }
+]
