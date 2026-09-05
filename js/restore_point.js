@@ -15,10 +15,91 @@
  */
 
 let restorePointPending = false;
+let restorePointMessageTimer = null;
+
+
+/*
+ * Wyświetla nieblokujący komunikat operacji na środku aplikacji.
+ */
+function showRestorePointMessage(message, type) {
+
+  const app = document.getElementById('app');
+
+  if (!app) {
+
+    console.error('Brak elementu app.');
+    return;
+  }
+
+  let messageElement =
+    document.getElementById('restorePointMessage');
+
+  if (!messageElement) {
+
+    messageElement = document.createElement('div');
+    messageElement.id = 'restorePointMessage';
+    messageElement.setAttribute('role', 'status');
+    messageElement.setAttribute('aria-live', 'polite');
+
+    Object.assign(messageElement.style, {
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      zIndex: '70',
+      width: 'min(90%, 560px)',
+      padding: '22px 26px',
+      borderRadius: '18px',
+      background: 'rgba(18, 18, 18, .96)',
+      boxShadow: '0 12px 36px rgba(0, 0, 0, .55)',
+      fontSize: 'clamp(20px, 5vw, 30px)',
+      fontWeight: '900',
+      lineHeight: '1.35',
+      textAlign: 'center',
+      pointerEvents: 'none'
+    });
+
+    app.appendChild(messageElement);
+  }
+
+  const colors = {
+    ok: '#7CFC00',
+    warn: '#ffd966',
+    error: '#ff5c5c'
+  };
+
+  messageElement.style.color =
+    colors[type] || colors.ok;
+
+  messageElement.setAttribute(
+    'role',
+    type === 'error' ? 'alert' : 'status'
+  );
+
+  messageElement.textContent = message;
+
+  if (restorePointMessageTimer !== null) {
+
+    clearTimeout(restorePointMessageTimer);
+  }
+
+  restorePointMessageTimer = setTimeout(
+    function() {
+
+      messageElement.remove();
+      restorePointMessageTimer = null;
+    },
+    3500
+  );
+}
 
 
 async function restorePoint() {
 
+    return;
+  }
+
+  /* Zapis bieżącego strzału musi zakończyć się przed cofnięciem. */
   if (
     typeof getAppState !== 'function' ||
     typeof setAppState !== 'function' ||
@@ -29,7 +110,7 @@ async function restorePoint() {
       'Brak centralnej obsługi stanu aplikacji.'
     );
 
-    showOperationMessage(
+    showRestorePointMessage(
       'Nie można ustalić stanu aplikacji.',
       'error'
     );
@@ -41,7 +122,7 @@ async function restorePoint() {
 
   if (currentState !== APP_STATES.JUDGE_MENU) {
 
-    showOperationMessage(
+    showRestorePointMessage(
       'Cofnięcie strzału jest dostępne wyłącznie w MENU SĘDZIEGO.',
       'warn'
     );
@@ -55,7 +136,7 @@ async function restorePoint() {
     scoreState.locked
   ) {
 
-    showOperationMessage(
+    showRestorePointMessage(
       'Poczekaj na zakończenie zapisu strzału.',
       'warn'
     );
@@ -65,7 +146,7 @@ async function restorePoint() {
 
   if (restorePointPending) {
 
-    showOperationMessage(
+    showRestorePointMessage(
       'Cofanie ostatniego strzału już trwa.',
       'warn'
     );
@@ -75,7 +156,7 @@ async function restorePoint() {
 
   if (typeof scoreState === 'undefined') {
 
-    showOperationMessage(
+    showRestorePointMessage(
       'Brak aktywnego stanu rundy.',
       'error'
     );
@@ -104,7 +185,7 @@ async function restorePoint() {
       /* Odrzucenie operacji nie zamyka MENU SĘDZIEGO. */
       setAppState(APP_STATES.JUDGE_MENU);
 
-      showOperationMessage(
+      showRestorePointMessage(
         result.message ||
           'Nie można cofnąć ostatniego strzału.',
         'warn'
@@ -144,7 +225,7 @@ async function restorePoint() {
       );
     }
 
-    showOperationMessage(
+    showRestorePointMessage(
       'Ostatni wynik został skasowany.',
       'ok'
     );
@@ -159,7 +240,7 @@ async function restorePoint() {
     /* Błąd techniczny pozostawia użytkownika w MENU SĘDZIEGO. */
     setAppState(APP_STATES.JUDGE_MENU);
 
-    showOperationMessage(
+    showRestorePointMessage(
       error.message ||
         'Nie udało się cofnąć ostatniego strzału.',
       'error'

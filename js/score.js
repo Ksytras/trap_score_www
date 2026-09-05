@@ -454,4 +454,22 @@ function finishRound() {
     APP_STATES.ROUND_OPERATIONS
   );
 
+
+  if (
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
+
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
+
+    return false;
+  }
+
+
+  return setAppState(
+    APP_STATES.ROUND_OPERATIONS
+  );
+
 }
