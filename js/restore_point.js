@@ -96,6 +96,10 @@ function showRestorePointMessage(message, type) {
 
 async function restorePoint() {
 
+    return;
+  }
+
+  /* Zapis bieżącego strzału musi zakończyć się przed cofnięciem. */
   if (
     typeof getAppState !== 'function' ||
     typeof setAppState !== 'function' ||

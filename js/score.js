@@ -454,25 +454,22 @@ function finishRound() {
     APP_STATES.ROUND_OPERATIONS
   );
 
-}
+
+  if (
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
+
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
+
+    return false;
+  }
 
 
-/*
- * ============================================================
- * OPÓŹNIENIE
- * ============================================================
- */
-
-function sleep(milliseconds) {
-
-  return new Promise(
-
-    resolve =>
-      setTimeout(
-        resolve,
-        milliseconds
-      )
-
+  return setAppState(
+    APP_STATES.ROUND_OPERATIONS
   );
 
 }
