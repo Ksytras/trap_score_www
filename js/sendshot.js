@@ -29,6 +29,13 @@
  * może być ustawione przez file_list.js podczas
  * przywracania rundy.
  *
+ * Kontrakt stanu:
+ *
+ *   - strzał można zapisać wyłącznie w stanie SHOOTING,
+ *   - ostatni strzał przełącza aplikację przez finishRound()
+ *     do stanu ROUND_OPERATIONS,
+ *   - ten moduł nie steruje bezpośrednio widocznością głównych widoków.
+ *
  * ============================================================
  */
 
@@ -44,10 +51,39 @@ async function sendShot(result) {
 
   /*
    * ==========================================================
+   * KONTROLA STANU APLIKACJI
+   * ==========================================================
+   */
+
+  if (
+    typeof getAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
+
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
+
+    return;
+  }
+
+
+  if (getAppState() !== APP_STATES.SHOOTING) {
+
+    console.warn(
+      'Strzał można zapisać wyłącznie w stanie SHOOTING.'
+    );
+
+    return;
+  }
+
+
+  /*
+   * ==========================================================
    * BLOKADA
    * ==========================================================
    *
-   * To musi być pierwszy warunek.
+   * To musi być pierwszy warunek po potwierdzeniu stanu SHOOTING.
    *
    * Dzięki temu kliknięcie ekranu w czasie przywracania
    * rundy NIE zapisze wyniku.
@@ -313,25 +349,47 @@ async function sendShot(result) {
       }
 
 
-      /*
-       * Komunikat końcowy.
-       */
+      if (apiResult.maxShot !== undefined) {
 
-      showStatus(
-        'Runda kompletna.',
-        'ok'
-      );
+        const returnedMaxShot =
+          Number(apiResult.maxShot);
 
 
-      /*
-       * Pokazujemy ekran zakończenia,
-       * jeżeli istnieje.
-       */
+        if (
+          Number.isInteger(returnedMaxShot) &&
+          returnedMaxShot > 0
+        ) {
 
-      const roundFinish =
-        document.getElementById(
-          'roundFinish'
+          scoreState.maxShot =
+            returnedMaxShot;
+        }
+      }
+
+
+      if (typeof finishRound !== 'function') {
+
+        console.error(
+          'Brak funkcji finishRound().'
         );
+
+        showStatus(
+          'Runda została zapisana, ale nie udało się otworzyć ekranu zakończenia.',
+          'error'
+        );
+
+        return;
+      }
+
+
+      if (!finishRound()) {
+
+        showStatus(
+          'Runda została zapisana, ale nie udało się przejść do operacji rundy.',
+          'error'
+        );
+
+        return;
+      }
 
 
       const finishMessage =
@@ -347,12 +405,10 @@ async function sendShot(result) {
       }
 
 
-      if (roundFinish) {
-
-        roundFinish.classList.add(
-          'show'
-        );
-      }
+      showStatus(
+        'Runda kompletna.',
+        'ok'
+      );
 
 
       return;
