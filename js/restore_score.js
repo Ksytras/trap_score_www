@@ -1,258 +1,220 @@
 /*
  * ============================================================
- * RESTORE SCORE
+ * PRZYWRACANIE ZAPISANEJ RUNDY
  * ============================================================
  *
- * Przywracanie rundy z wybranego pliku:
+ * Kontrakt przejść:
  *
- *   /wyniki/
+ * - runda częściowa   -> SHOOTING,
+ * - runda zakończona  -> ROUND_OPERATIONS przez finishRound(),
+ * - odrzucenie API    -> JUDGE_MENU,
+ * - błąd techniczny   -> JUDGE_MENU.
  *
- * Funkcja:
- *
- *   restoreScore(filename)
- *
- * ============================================================
+ * Widocznością głównych widoków zarządza wyłącznie setAppState().
  */
+
+let restoreScorePending = false;
+
 
 async function restoreScore(filename) {
 
-  /*
-   * Sprawdzamy nazwę pliku.
-   */
+  if (
+    typeof getAppState !== 'function' ||
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
 
-  if (!filename) {
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
+
+    showStatus(
+      'Nie można ustalić stanu aplikacji.',
+      'error'
+    );
+
+    return false;
+  }
+
+  const currentState = getAppState();
+
+  if (
+    currentState !== APP_STATES.JUDGE_MENU &&
+    currentState !== APP_STATES.ROUND_OPERATIONS
+  ) {
+
+    showStatus(
+      'Przywracanie rundy jest dostępne wyłącznie z MENU SĘDZIEGO.',
+      'warn'
+    );
+
+    return false;
+  }
+
+  if (
+    typeof filename !== 'string' ||
+    filename.trim() === ''
+  ) {
+
+    setAppState(APP_STATES.JUDGE_MENU);
 
     showStatus(
       'Brak nazwy pliku.',
       'error'
     );
 
-    return;
+    return false;
   }
 
-
-  try {
-
-    /*
-     * Informacja dla sędziego.
-     */
+  if (restoreScorePending) {
 
     showStatus(
-      'Przywracanie rundy...',
+      'Przywracanie rundy już trwa.',
       'warn'
     );
 
+    return false;
+  }
 
-    /*
-     * Wysyłamy żądanie do API.
-     */
+  if (typeof scoreState === 'undefined') {
 
-    const response =
-      await fetch(API_URL, {
+    setAppState(APP_STATES.JUDGE_MENU);
 
-        method: 'POST',
-
-        headers: {
-          'Content-Type': 'application/json'
-        },
-
-        body: JSON.stringify({
-
-          action: 'restore_score',
-
-          filename: filename
-
-        })
-
-      });
-
-
-    /*
-     * Odczytujemy odpowiedź API.
-     */
-
-    const result =
-      await response.json();
-
-
-    console.log(
-      'restore_score:',
-      result
+    showStatus(
+      'Brak aktywnego stanu wyników.',
+      'error'
     );
 
+    return false;
+  }
 
-    /*
-     * Błąd HTTP lub błąd API.
-     */
+  restoreScorePending = true;
+  scoreState.locked = true;
 
-    if (
-      !response.ok ||
-      !result.success
-    ) {
+  showStatus(
+    'Przywracanie rundy...',
+    'warn'
+  );
+
+  try {
+
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: 'restore_score',
+        filename: filename.trim()
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+
+      scoreState.locked = false;
+      setAppState(APP_STATES.JUDGE_MENU);
 
       showStatus(
         result.message ||
-        'Nie udało się przywrócić rundy.',
-        'error'
+          'Nie udało się przywrócić rundy.',
+        'warn'
       );
 
-      return;
+      return false;
     }
 
+    if (result.maxShot !== undefined) {
 
-    /*
-     * ========================================================
-     * AKTUALIZACJA STANU RUNDY
-     * ========================================================
-     */
-
-    if (
-      typeof scoreState !== 'undefined'
-    ) {
-
-      /*
-       * Runda częściowa.
-       *
-       * API zwraca miejsce pierwszego
-       * brakującego wyniku.
-       */
+      const returnedMaxShot = Number(result.maxShot);
 
       if (
-        typeof result.shooterIndex === 'number'
+        !Number.isInteger(returnedMaxShot) ||
+        returnedMaxShot < 1
       ) {
 
-        scoreState.shooterIndex =
-          result.shooterIndex;
+        throw new Error(
+          'Serwer zwrócił nieprawidłową liczbę strzałów.'
+        );
       }
 
-
-      if (
-        typeof result.shotNumber === 'number'
-      ) {
-
-        scoreState.shotNumber =
-          result.shotNumber;
-      }
-
-
-      scoreState.locked = false;
+      scoreState.maxShot = returnedMaxShot;
     }
 
+    if (result.roundFinished === true) {
 
-    /*
-     * ========================================================
-     * RUNDA PEŁNA
-     * ========================================================
-     */
+      if (typeof finishRound !== 'function') {
 
-    if (
-      result.roundFinished === true
-    ) {
-
-      /*
-       * Nie pokazujemy przycisków strzałów,
-       * ponieważ nie ma już wolnego miejsca.
-       */
-
-      const buttons =
-        document.getElementById('buttons');
-
-      if (buttons) {
-
-        buttons.style.display =
-          'none';
+        throw new Error(
+          'Brak funkcji finishRound().'
+        );
       }
 
+      /* Zakończona runda nie może przyjmować kolejnych strzałów. */
+      scoreState.locked = true;
 
-      /*
-       * Czyścimy dane zawodnika.
-       */
+      if (!finishRound()) {
 
-      const name =
-        document.getElementById('name');
-
-      const club =
-        document.getElementById('club');
-
-      const shot =
-        document.getElementById('shot');
-
-      if (name) {
-        name.textContent = '';
+        throw new Error(
+          'Nie udało się otworzyć widoku zakończonej rundy.'
+        );
       }
 
-      if (club) {
-        club.textContent = '';
+      const finishMessage =
+        document.getElementById('finishMessage');
+
+      if (finishMessage) {
+
+        finishMessage.textContent =
+          'Przywrócona runda jest kompletna.';
       }
-
-      if (shot) {
-        shot.textContent = '';
-      }
-
-
-      /*
-       * Runda jest kompletna.
-       */
 
       showStatus(
-        'Runda kompletna.',
+        'Przywrócono zakończoną rundę.',
         'ok'
       );
 
-
-      return;
+      return true;
     }
 
-
-    /*
-     * ========================================================
-     * RUNDA CZĘŚCIOWA
-     * ========================================================
-     */
-
-    /*
-     * Wyświetlamy zawodnika,
-     * którego kolej przypada jako następna.
-     */
-
     if (
-      result.shooter &&
-      typeof displayCurrentShooter === 'function'
+      typeof result.shooterIndex !== 'number' ||
+      typeof result.shotNumber !== 'number' ||
+      !result.shooter
     ) {
 
-      displayCurrentShooter(
-        result.shooter
+      throw new Error(
+        'Serwer zwrócił niepełny stan przywracanej rundy.'
       );
     }
 
+    if (typeof displayCurrentShooter !== 'function') {
 
-    /*
-     * Pokazujemy przyciski
-     * TRAFIONY / PUDŁO.
-     */
-
-    const buttons =
-      document.getElementById('buttons');
-
-    if (buttons) {
-
-      buttons.style.display =
-        'grid';
+      throw new Error(
+        'Brak funkcji wyświetlającej zawodnika.'
+      );
     }
 
+    scoreState.shooterIndex = result.shooterIndex;
+    scoreState.shotNumber = result.shotNumber;
+    scoreState.locked = false;
 
-    /*
-     * Informacja po przywróceniu.
-     *
-     * Zostanie wyczyszczona przy oddaniu
-     * następnego strzału.
-     */
+    displayCurrentShooter(result.shooter);
+
+    if (!setAppState(APP_STATES.SHOOTING)) {
+
+      throw new Error(
+        'Nie udało się wrócić do widoku strzelania.'
+      );
+    }
 
     showStatus(
       'Runda przywrócona.',
       'ok'
     );
 
+    return true;
 
   } catch (error) {
 
@@ -261,11 +223,19 @@ async function restoreScore(filename) {
       error
     );
 
+    scoreState.locked = false;
+    setAppState(APP_STATES.JUDGE_MENU);
 
     showStatus(
       error.message ||
-      'Nie udało się przywrócić rundy.',
+        'Nie udało się przywrócić rundy.',
       'error'
     );
+
+    return false;
+
+  } finally {
+
+    restoreScorePending = false;
   }
 }
