@@ -57,9 +57,7 @@ async function sendShot(result) {
 
   if (
     typeof getAppState !== 'function' ||
-    typeof APP_STATES === 'undefined' ||
-    typeof showOperationMessage !== 'function' ||
-    typeof clearOperationMessage !== 'function'
+    typeof APP_STATES === 'undefined'
   ) {
 
     console.error(
@@ -399,7 +397,7 @@ async function sendShot(result) {
           'Brak funkcji finishRound().'
         );
 
-        showOperationMessage(
+        showStatus(
           'Runda została zapisana, ale nie udało się otworzyć ekranu zakończenia.',
           'error'
         );
@@ -410,7 +408,7 @@ async function sendShot(result) {
 
       if (!finishRound()) {
 
-        showOperationMessage(
+        showStatus(
           'Runda została zapisana, ale nie udało się przejść do operacji rundy.',
           'error'
         );
