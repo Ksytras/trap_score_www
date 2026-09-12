@@ -83,6 +83,12 @@ function setAppState(state) {
   const buttons =
     document.getElementById('buttons');
 
+  const hitButton =
+    document.getElementById('hitBtn');
+
+  const missButton =
+    document.getElementById('missBtn');
+
   const restoreFileWindow =
     document.getElementById('restoreFileWindow');
 
@@ -146,6 +152,37 @@ function setAppState(state) {
 
       if (buttons) {
 
+        buttons.style.display = 'grid';
+      }
+
+      /*
+       * Stan SHOOTING synchronizuje również aktywność sterowania.
+       * Domyślnie przyciski są aktywne, więc nie dziedziczą disabled
+       * z ekranu końcowego. Przepływy z krótką blokadą przekazują opcję.
+       */
+      const controlsLocked =
+        options.controlsLocked === true;
+
+      if (hitButton) {
+
+        hitButton.disabled = controlsLocked;
+        hitButton.style.pointerEvents =
+          controlsLocked ? 'none' : 'auto';
+        hitButton.setAttribute(
+          'aria-disabled',
+          String(controlsLocked)
+        );
+      }
+
+      if (missButton) {
+
+        missButton.disabled = controlsLocked;
+        missButton.style.pointerEvents =
+          controlsLocked ? 'none' : 'auto';
+        missButton.setAttribute(
+          'aria-disabled',
+          String(controlsLocked)
+        );
         buttons.classList.add('show-buttons');
       }
 
