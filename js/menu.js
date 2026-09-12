@@ -51,7 +51,7 @@ function getAppState() {
  * Najpierw ukrywa wszystkie główne widoki, a następnie pokazuje
  * wyłącznie widok należący do wskazanego stanu.
  */
-function setAppState(state, options = {}) {
+function setAppState(state) {
 
   if (!APP_STATE_VALUES.includes(state)) {
 
@@ -83,12 +83,6 @@ function setAppState(state, options = {}) {
   const buttons =
     document.getElementById('buttons');
 
-  const hitButton =
-    document.getElementById('hitBtn');
-
-  const missButton =
-    document.getElementById('missBtn');
-
   const restoreFileWindow =
     document.getElementById('restoreFileWindow');
 
@@ -118,7 +112,7 @@ function setAppState(state, options = {}) {
 
   if (buttons) {
 
-    buttons.style.display = 'none';
+    buttons.classList.remove('show-buttons');
   }
 
   /* Pokazujemy wyłącznie widok należący do nowego stanu. */
@@ -152,25 +146,7 @@ function setAppState(state, options = {}) {
 
       if (buttons) {
 
-        buttons.style.display = 'grid';
-      }
-
-      /*
-       * Stan SHOOTING synchronizuje również aktywność sterowania.
-       * Domyślnie przyciski są aktywne, więc nie dziedziczą disabled
-       * z ekranu końcowego. Przepływy z krótką blokadą przekazują opcję.
-       */
-      const controlsLocked =
-        options.controlsLocked === true;
-
-      if (hitButton) {
-
-        hitButton.disabled = controlsLocked;
-      }
-
-      if (missButton) {
-
-        missButton.disabled = controlsLocked;
+        buttons.classList.add('show-buttons');
       }
 
       break;
