@@ -146,6 +146,8 @@ async function sendShot(result) {
   scoreState.locked =
     true;
 
+  const shotStartedAt = Date.now();
+
 
   /*
    * Pobieramy przyciski.
@@ -192,9 +194,10 @@ async function sendShot(result) {
       : 'PUDŁO';
 
 
-  showStatus(
+  showOperationMessage(
     resultText,
-    'warn'
+    'warn',
+    0
   );
 
 
@@ -286,9 +289,11 @@ async function sendShot(result) {
       !apiResult.success
     ) {
 
-      showStatus(
+      clearOperationMessage();
+
+      showOperationMessage(
         apiResult.message ||
-        'Nie udało się zapisać wyniku.',
+          'Nie udało się zapisać wyniku.',
         'error'
       );
 
@@ -318,6 +323,21 @@ async function sendShot(result) {
 
       return;
     }
+
+
+    /*
+     * Komunikat TRAFIONY / PUDŁO oraz bieżący zawodnik pozostają
+     * na ekranie przez pełny czas blokady liczony od kliknięcia.
+     */
+    const elapsedTime = Date.now() - shotStartedAt;
+    const remainingTime = Math.max(0, 2000 - elapsedTime);
+
+    if (remainingTime > 0) {
+
+      await sleep(remainingTime);
+    }
+
+    clearOperationMessage();
 
 
     /*
@@ -421,18 +441,14 @@ async function sendShot(result) {
      * ========================================================
      */
 
-    if (
-      typeof apiResult.nextShooterIndex === 'number'
-    ) {
+    if (typeof apiResult.nextShooterIndex === 'number') {
 
       scoreState.shooterIndex =
         apiResult.nextShooterIndex;
     }
 
 
-    if (
-      typeof apiResult.nextShotNumber === 'number'
-    ) {
+    if (typeof apiResult.nextShotNumber === 'number') {
 
       scoreState.shotNumber =
         apiResult.nextShotNumber;
@@ -454,29 +470,6 @@ async function sendShot(result) {
         apiResult.nextShooter
       );
     }
-
-
-    /*
-     * ========================================================
-     * KRÓTKA BLOKADA PO STRZALE
-     * ========================================================
-     *
-     * 2 sekundy.
-     *
-     * W tym czasie nie można kliknąć ponownie.
-     */
-
-    await sleep(2000);
-
-
-    /*
-     * Usuwamy komunikat TRAFIONY/PUDŁO.
-     */
-
-    showStatus(
-      '',
-      ''
-    );
 
 
     /*
@@ -513,9 +506,11 @@ async function sendShot(result) {
      * Pokazujemy błąd.
      */
 
-    showStatus(
+    clearOperationMessage();
+
+    showOperationMessage(
       error.message ||
-      'Błąd połączenia z API.',
+        'Błąd połączenia z API.',
       'error'
     );
 
