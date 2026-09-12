@@ -116,7 +116,7 @@ async function restoreScore(filename) {
       scoreState.locked = false;
       setAppState(APP_STATES.JUDGE_MENU);
 
-      showStatus(
+      showOperationMessage(
         result.message ||
           'Nie udało się przywrócić rundy.',
         'warn'
@@ -231,7 +231,7 @@ async function restoreScore(filename) {
     scoreState.locked = false;
     setAppState(APP_STATES.JUDGE_MENU);
 
-    showStatus(
+    showOperationMessage(
       error.message ||
         'Nie udało się przywrócić rundy.',
       'error'

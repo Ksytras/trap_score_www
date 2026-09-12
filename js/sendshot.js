@@ -352,8 +352,13 @@ async function sendShot(result) {
 
 
       /*
-       * Przyciski pozostają zablokowane.
+       * Przyciski DOM pozostają nieaktywne na ekranie końcowym, ale
+       * zwalniamy blokadę operacji. Dzięki temu po otwarciu MENU SĘDZIEGO
+       * można użyć funkcji COFNIJ OSTATNI STRZAŁ.
        */
+
+      scoreState.locked =
+        false;
 
       if (hitBtn) {
 
