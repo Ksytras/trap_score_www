@@ -1,493 +1,388 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8">
-  <title>PANEL SĘDZIEGO</title>
-  <base target="_top">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      min-height: 100%;
-      background: #0b0b0b;
-      color: #fff;
-      font-family: Arial, Helvetica, sans-serif;
-    }
-    body {
-      overflow: hidden;
-    }
-    .wrap {
-      min-height: 100vh;
-      min-height: 100dvh;
-      display: flex;
-      align-items: stretch;
-      justify-content: center;
-      padding: 0;
-    }
-    .card {
-      width: min(100%, 700px);
-      min-height: 100vh;
-      min-height: 100dvh;
-      background: #121212;
-      display: flex;
-      flex-direction: column;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
+<meta charset="UTF-8">
+<title>TeGeS — Tablica Wyników Trap</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#000000;
+    --row-bg:#0c0c0c;
+    --row-bg-alt:#111111;
+    --grid-line:#2a2a2a;
+    --text:#f2f2f2;
+    --text-dim:#9a9a9a;
+    --gold:#e8c34a;
+    --silver:#c9c9c9;
+    --bronze:#d98a3d;
+    --hit:#3ecb5e;
+    --miss:#e24a4a;
+    --empty-ring:#3a3a3a;
+  }
 
-    /*
-     * Główny kontener aplikacji.
-     * data-state jest przygotowany jako centralny kontrakt stanów aplikacji.
-     * Na tym etapie istniejące klasy/ID pozostają bez zmian, aby nie zerwać
-     * aktualnej logiki JavaScript. Kolejne pliki JS będą stopniowo przejmować
-     * sterowanie widocznością na podstawie data-state.
-     */
-    #app[data-state="ready"] {}
-    #app[data-state="judge-menu"] {}
-    #app[data-state="new-round"] {}
-    #app[data-state="shooting"] {}
-    #app[data-state="round-operations"] {}
+  *{ box-sizing:border-box; }
 
-    .topBar {
-      padding: 14px 16px 10px;
-      background: #171717;
-      box-shadow: 0 2px 10px rgba(0,0,0,.25);
-      z-index: 2;
-    }
-    .title {
-      font-size: 18px;
-      opacity: .75;
-      margin-bottom: 6px;
-    }
-    .name {
-      font-size: clamp(32px, 7vw, 52px);
-      font-weight: 900;
-      line-height: 1.1;
-      margin-bottom: 6px;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
-    .club {
-      font-size: clamp(16px, 3.8vw, 22px);
-      color: #bdbdbd;
-      margin-bottom: 8px;
-      overflow-wrap: anywhere;
-    }
-    .shot {
-      font-size: clamp(22px, 4.8vw, 30px);
-      font-weight: 800;
-      color: #9ad6ff;
-    }
-    .mainButtons {
-      flex: 1;
-      display: grid;
-      grid-template-rows: 1fr 1fr;
-      gap: 14px;
-      padding: 14px;
-      padding-bottom: 96px;
-      min-height: 0;
-    }
-    button {
-      width: 100%;
-      border: none;
-      border-radius: 22px;
-      font-weight: 900;
-      cursor: pointer;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .hit, .miss {
-      min-height: 220px;
-      font-size: clamp(44px, 10vw, 82px);
-      letter-spacing: 1px;
-      box-shadow: 0 10px 24px rgba(0,0,0,.35);
-    }
-    .hit {
-      background: #1bb14c;
-      color: #fff;
-    }
-    .miss {
-      background: #d54242;
-      color: #fff;
-    }
-    .bottomBar {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 0 14px max(14px, env(safe-area-inset-bottom));
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
-      background: #121212;
-      z-index: 3;
-    }
-    .menuBtn {
-      background: #2f2f2f;
-      color: #fff;
-      min-height: 68px;
-      font-size: clamp(20px, 4.5vw, 28px);
-      border-radius: 18px;
-    }
-    .status {
-      min-height: 28px;
-      padding: 0 16px 84px;
-      color: #ddd;
-      font-size: clamp(14px, 3vw, 16px);
-      line-height: 1.4;
-      overflow-wrap: anywhere;
-    }
-    .status-ok {
-      color: #7CFC00;
-    }
-    .status-warn {
-      color: #ffd966;
-    }
-    .status-error {
-      color: #ff7b7b;
-    }
-    .shotFlash {
-      display: none;
-      position: absolute;
-      inset: 0;
-      z-index: 25;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      background: rgba(0,0,0,.15);
-    }
-    .shotFlash.show {
-      display: flex;
-    }
-    .shotFlashText {
-      font-size: clamp(42px, 11vw, 86px);
-      font-weight: 900;
-      color: #ffd966;
-      text-shadow: 0 4px 16px rgba(0,0,0,.65);
-      letter-spacing: 2px;
-    }
-    .roundFinish {
-      display: none;
-      position: absolute;
-      inset: 0;
-      background: rgba(10,10,10,.96);
-      z-index: 30;
-      text-align: center;
-      padding: 28px 18px;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      cursor: pointer;
-    }
-    .roundFinish.show {
-      display: flex;
-    }
-    .finishTitle {
-      font-size: clamp(36px, 10vw, 64px);
-      font-weight: 900;
-      color: #ffd966;
-      margin-bottom: 12px;
-      letter-spacing: 1px;
-    }
-    .finishSubtitle {
-      font-size: clamp(22px, 5vw, 30px);
-      color: #9ad6ff;
-      margin-bottom: 12px;
-    }
-    .finishMessage {
-      font-size: clamp(18px, 4vw, 26px);
-      margin-bottom: 22px;
-      line-height: 1.4;
-      max-width: 90%;
-    }
-    .finishTouch {
-      font-size: clamp(16px, 4vw, 24px);
-      font-weight: 800;
-      color: #7CFC00;
-      animation: blink 1.2s infinite;
-    }
-    .menuOverlay, .setupOverlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,.55);
-      z-index: 40;
-      display: none;
-    }
-    .menuOverlay.show, .setupOverlay.show {
-      display: block;
-    }
-    .menuPanel, .setupPanel {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: #1b1b1b;
-      border-top-left-radius: 26px;
-      border-top-right-radius: 26px;
-      padding: 18px 14px max(18px, env(safe-area-inset-bottom));
-      box-shadow: 0 -10px 30px rgba(0,0,0,.45);
-      transform: translateY(105%);
-      transition: transform .22s ease;
-    }
-    .menuOverlay.show .menuPanel, .setupOverlay.show .setupPanel {
-      transform: translateY(0);
-    }
-    .menuTitle, .setupTitle {
-      font-size: clamp(24px, 5vw, 32px);
-      font-weight: 900;
-      margin-bottom: 14px;
-      color: #ffd966;
-    }
-    .menuButtons, .setupButtons {
-      display: grid;
-      gap: 12px;
-    }
-    .menuAction, .setupAction {
-      min-height: 68px;
-      border-radius: 18px;
-      font-size: clamp(18px, 4.2vw, 24px);
-      color: #fff;
-      background: #3e3e3e;
-    }
-    .menuAction.warn {
-      background: #7b5b00;
-    }
-    .menuAction.danger, .setupAction.danger {
-      background: #8b2d2d;
-    }
-    .menuAction.saveRound {
-      background: #1b7f3a;
-    }
-    .menuAction.close, .setupAction.close {
-      background: #2d5a88;
-    }
-    .setupAction.save {
-      background: #1b7f3a;
-    }
-    .setupContent {
-      max-height: 70vh;
-      overflow-y: auto;
-      padding-right: 2px;
-    }
-    .setupRowTop {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      align-items: end;
-      margin-bottom: 14px;
-    }
-    .field {
-      text-align: left;
-    }
-    .field label {
-      display: block;
-      font-size: 14px;
-      color: #ccc;
-      margin-bottom: 6px;
-    }
-    .field input {
-      width: 100%;
-      min-height: 52px;
-      border: none;
-      border-radius: 14px;
-      padding: 10px 12px;
-      font-size: 18px;
-      background: #2a2a2a;
-      color: #fff;
-    }
-    .setupList {
-      display: grid;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .setupShooterRow {
-      background: #232323;
-      border-radius: 16px;
-      padding: 12px;
-      display: grid;
-      gap: 10px;
-    }
-    .setupShooterHeader {
-      font-weight: 800;
-      color: #9ad6ff;
-      text-align: left;
-    }
-    .setupHint {
-      font-size: 14px;
-      color: #bbb;
-      text-align: left;
-      margin-bottom: 10px;
-    }
-    button:active {
-      transform: scale(.985);
-    }
-    button:disabled {
-      opacity: .55;
-      cursor: default;
-    }
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: .35; }
-    }
-    @media (orientation: landscape) {
-      .card {
-        width: min(100%, 1100px);
-      }
-      .topBar {
-        padding: 10px 16px 8px;
-      }
-      .mainButtons {
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1fr;
-      }
-      .hit, .miss {
-        min-height: 0;
-        height: 100%;
-        font-size: clamp(42px, 6vw, 76px);
-      }
-    }
-    @media (max-height: 560px) {
-      .hit, .miss {
-        min-height: 140px;
-      }
-      .menuBtn, .menuAction, .setupAction {
-        min-height: 54px;
-      }
-      .field input {
-        min-height: 44px;
-      }
-    }
-    .numberControl {
-      display: grid;
-      grid-template-columns: 58px minmax(70px, 1fr) 58px;
-      gap: 6px;
-      align-items: stretch;
-    }
-    .numberControl .numberButton {
-      min-height: 52px;
-      border-radius: 14px;
-      background: #3e3e3e;
-      color: #fff;
-      font-size: 32px;
-      font-weight: 900;
-      line-height: 1;
-    }
-    .numberControl input {
-      width: 100%;
-      min-height: 52px;
-      border: none;
-      border-radius: 14px;
-      padding: 10px 8px;
-      font-size: 22px;
-      font-weight: 900;
-      text-align: center;
-      background: #2a2a2a;
-      color: #fff;
-    }
-    .numberControl input::-webkit-inner-spin-button,
-    .numberControl input::-webkit-outer-spin-button {
-      -webkit-appearance: none;
-      margin: 0;
-    }
-    .numberControl input[type="number"] {
-      -moz-appearance: textfield;
-    }
-  </style>
+  html,body{
+    margin:0;
+    padding:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Segoe UI", Roboto, Arial, sans-serif;
+  }
+
+  .page{
+    max-width:1760px;
+    margin:0 auto;
+    padding:clamp(14px,2vw,28px) clamp(10px,2vw,24px) 60px;
+  }
+
+  .header{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:clamp(12px,2vw,24px);
+    margin-bottom:clamp(16px,2.5vw,28px);
+  }
+
+  .header img.logo-round{
+    height:clamp(64px,7vw,96px);
+    width:clamp(64px,7vw,96px);
+    border-radius:50%;
+    flex-shrink:0;
+  }
+
+  .header img.logo-rect{
+    height:clamp(90px,11vw,150px);
+    width:auto;
+    border-radius:4px;
+    flex-shrink:0;
+  }
+
+  .header .title{
+    margin-left:auto;
+    text-align:right;
+  }
+
+  .header .title h1{
+    margin:0;
+    font-size:clamp(16px,2vw,22px);
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--text);
+  }
+
+  .header .title .sub{
+    margin-top:4px;
+    font-size:11px;
+    color:var(--text-dim);
+  }
+
+  .status-dot{
+    display:inline-block;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--hit);
+    margin-right:6px;
+    animation:pulse 2s infinite;
+  }
+
+  @keyframes pulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:.35; }
+  }
+
+  .table-wrap{
+    width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  table{
+    width:100%;
+    min-width:900px;
+    border-collapse:collapse;
+    table-layout:fixed;
+  }
+
+  col.col-pos{ width:48px; }
+  col.col-name{ width:150px; }
+  col.col-score{ width:78px; }
+  col.col-shot{ width:26px; }
+
+  thead th{
+    background:#000;
+    color:var(--text);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+    font-weight:600;
+    padding:9px 4px;
+    border-bottom:2px solid var(--grid-line);
+    position:sticky;
+    top:0;
+    z-index:2;
+  }
+
+  /* Zamrożone kolumny: Pos. / Shooter Name / Score — przewija się tylko T1..T25 */
+  thead th:nth-child(1), tbody td:nth-child(1){ position:sticky; left:0; z-index:2; }
+  thead th:nth-child(2), tbody td:nth-child(2){ position:sticky; left:48px; z-index:2; }
+  thead th:nth-child(3), tbody td:nth-child(3){ position:sticky; left:198px; z-index:2; }
+
+  thead th:nth-child(1), thead th:nth-child(2), thead th:nth-child(3){ z-index:3; }
+
+  thead th:nth-child(3), tbody td:nth-child(3){
+    box-shadow:4px 0 6px -4px rgba(0,0,0,.7);
+  }
+
+  thead th.head-left{ text-align:left; padding-left:10px; }
+  thead th.head-center{ text-align:center; }
+  thead th.head-shot{ font-size:10px; padding:9px 2px; }
+
+  tbody td{
+    padding:7px 4px;
+    border-bottom:1px solid var(--grid-line);
+    font-size:13px;
+    text-align:center;
+    white-space:nowrap;
+  }
+
+  tbody td.cell-shot{
+    padding:5px 2px;
+  }
+
+  tbody td.cell-pos{
+    font-weight:800;
+    font-size:14px;
+  }
+
+  tbody td.cell-name{
+    text-align:left;
+    padding-left:10px;
+    font-weight:700;
+    letter-spacing:.01em;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  tbody td.cell-score{
+    font-weight:800;
+    font-size:14px;
+  }
+
+  /* Podium highlight — tylko na kolumnach Pos. / Shooter Name / Score */
+  tbody td.top-1{ background:var(--gold);   color:#111; }
+  tbody td.top-2{ background:var(--silver); color:#111; }
+  tbody td.top-3{ background:var(--bronze); color:#111; }
+
+  tbody td.top-1, tbody td.top-2, tbody td.top-3{
+    border-bottom:1px solid rgba(0,0,0,.25);
+  }
+
+  /* Naprzemienne tło — ustawiane bezpośrednio na komórkach,
+     bo kolumny Pos./Name/Score są "sticky" i potrzebują własnego,
+     nieprzezroczystego tła (nie mogą polegać na tle wiersza <tr>) */
+  tbody td.stripe-a{ background:var(--row-bg); }
+  tbody td.stripe-b{ background:var(--row-bg-alt); }
+
+  tr.row-normal:nth-child(odd) td.cell-shot{ background:var(--row-bg); }
+  tr.row-normal:nth-child(even) td.cell-shot{ background:var(--row-bg-alt); }
+
+  .dot{
+    display:inline-block;
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    vertical-align:middle;
+  }
+
+  .dot.hit{ background:var(--hit); box-shadow:0 0 4px rgba(62,203,94,.5); }
+  .dot.miss{ background:var(--miss); box-shadow:0 0 4px rgba(226,74,74,.5); }
+  .dot.pending{
+    background:transparent;
+    border:1.5px solid var(--empty-ring);
+  }
+
+  .empty-state{
+    padding:40px;
+    text-align:center;
+    color:var(--text-dim);
+    font-size:14px;
+  }
+
+  .footer-note{
+    margin-top:14px;
+    font-size:11px;
+    color:var(--text-dim);
+    text-align:right;
+  }
+
+  @media (max-width:640px){
+    .header{ justify-content:center; text-align:center; }
+    .header .title{ margin-left:0; text-align:center; width:100%; }
+    table{ min-width:760px; }
+  }
+</style>
 </head>
-
 <body>
-  <div class="wrap">
-    <div id="app" class="card" data-state="ready">
-      <div class="topBar">
-        <div class="title">PANEL SĘDZIEGO</div>
-        <div id="name" class="name"></div>
-        <div id="club" class="club"></div>
-        <div id="shot" class="shot"></div>
-      </div>
 
-      <div id="buttons" class="mainButtons" style="display:none;">
-        <button id="hitBtn" class="hit" onclick="sendShot('hit')">TRAFIONY</button>
-        <button id="missBtn" class="miss" onclick="sendShot('miss')">PUDŁO</button>
-      </div>
+<div class="page">
 
-      <div id="status" class="status"></div>
-
-      <div class="bottomBar">
-        <button class="menuBtn" onclick="openMenu()">MENU SĘDZIEGO</button>
-      </div>
-
-      <div id="shotFlash" class="shotFlash">
-        <div id="shotFlashText" class="shotFlashText"></div>
-      </div>
-
-      <div id="roundFinish" class="roundFinish" onclick="this.classList.remove('show'); openMenu();">
-        <div class="finishTitle">RUNDA ZAKOŃCZONA</div>
-        <div class="finishSubtitle">TRAP 25</div>
-        <div id="finishMessage" class="finishMessage"></div>
-        <div class="finishTouch">DOTKNIJ EKRAN ABY WRÓCIĆ</div>
-      </div>
-
-      <div id="menuOverlay" class="menuOverlay" onclick="closeMenu(event)">
-        <div class="menuPanel" onclick="event.stopPropagation()">
-          <div class="menuTitle">MENU SĘDZIEGO</div>
-          <div class="menuButtons">
-            <button class="menuAction danger" onclick="newGame()">NOWA RUNDA</button>
-            <button class="menuAction warn" onclick="openRestoreFiles()">PRZYWRÓĆ RUNDĘ</button>
-            <button class="menuAction" onclick="restorePoint()">COFNIJ OSTATNI STRZAŁ</button>
-            <button class="menuAction saveRound" onclick="saveGame()">ZAPISZ RUNDĘ</button>
-            <button class="menuAction close" onclick="closeMenu()">ZAMKNIJ</button>
-          </div>
-        </div>
-      </div>
-
-      <div id="setupOverlay" class="setupOverlay" onclick="closeSetup(event)">
-        <div class="setupPanel" onclick="event.stopPropagation()">
-          <div class="setupTitle">NOWA RUNDA</div>
-          <div class="setupContent">
-            <div class="setupRowTop">
-              <div class="field">
-                <label for="shooterCount">Liczba zawodników</label>
-                <div class="numberControl">
-                  <button type="button" class="numberButton" onclick="changeShooterCount(-1)" aria-label="Zmniejsz liczbę zawodników">−</button>
-                  <input id="shooterCount" type="number" min="1" max="200" value="1" inputmode="numeric" oninput="refreshShooterForm(false)" onblur="refreshShooterForm(true)">
-                  <button type="button" class="numberButton" onclick="changeShooterCount(1)" aria-label="Zwiększ liczbę zawodników">+</button>
-                </div>
-              </div>
-              <button class="setupAction" type="button" onclick="reloadShooterFormFromSheet()">ODŚWIEŻ LISTĘ</button>
-            </div>
-
-            <div class="setupHint">
-              Wpisz nazwę zawodnika. Klub może być pusty.
-            </div>
-
-            <div id="setupList" class="setupList"></div>
-          </div>
-
-          <div class="setupButtons">
-            <button class="setupAction save" type="button" onclick="saveNewRoundWithShooters()">ZAPISZ I ROZPOCZNIJ</button>
-            <button class="setupAction close" type="button" onclick="closeSetup()">ANULUJ</button>
-          </div>
-        </div>
-      </div>
+  <div class="header">
+    <img class="logo-round" src="src/l_ksa.png" alt="Braterstwo EU">
+    <img class="logo-rect" src="src/l_tgs.png" alt="TeGeS">
+    <div class="title">
+      <h1>Tablica Wyników — Trap</h1>
+      <div class="sub"><span class="status-dot"></span>na żywo — aktualizacja co <span id="refreshSecs">3</span> s · ostatnia aktualizacja: <span id="lastUpdate">—</span></div>
     </div>
   </div>
 
-  <script src="js/config.js"></script>
-  <script src="js/common.js"></script>
-  <script src="js/menu.js"></script>
-  <script src="js/new_game.js"></script>
-  <script src="js/save_game.js"></script>
-  <script src="js/score.js"></script>
-  <script src="js/sendshot.js"></script>
-  <script src="js/display.js"></script>
-  <script src="js/restore_point.js"></script>
-  <script src="js/restore_score.js"></script>
-  <script src="js/file_list.js"></script>
+  <div class="table-wrap">
+  <table id="scoreboard">
+    <colgroup>
+      <col class="col-pos">
+      <col class="col-name">
+      <col class="col-score">
+      <!-- T1..T25 columns injected by JS -->
+    </colgroup>
+    <thead>
+      <tr id="headRow">
+        <th class="head-center">Pos.</th>
+        <th class="head-left">Shooter Name</th>
+        <th class="head-center">Score</th>
+        <!-- T1..T25 injected by JS -->
+      </tr>
+    </thead>
+    <tbody id="scoreBody">
+      <tr><td colspan="28" class="empty-state">Wczytywanie wyników…</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="footer-note">Dane: wyniki.json · odświeżanie automatyczne</div>
+
+</div>
+
+<script>
+(function(){
+
+  const DATA_URL = "wyniki.json";
+  const REFRESH_MS = 3000;      // 3 s — w zakresie 2-5 s
+  const MAX_TARGETS = 25;       // T1..T25
+  const MAX_ROWS = 200;         // limit wierszy
+
+  document.getElementById("refreshSecs").textContent = (REFRESH_MS/1000).toString();
+
+  // Build the T1..T25 header cells once
+  const headRow = document.getElementById("headRow");
+  const colgroup = document.querySelector("#scoreboard colgroup");
+  for(let i=1;i<=MAX_TARGETS;i++){
+    const th = document.createElement("th");
+    th.className = "head-center head-shot";
+    th.textContent = "T" + i;
+    headRow.appendChild(th);
+
+    const col = document.createElement("col");
+    col.className = "col-shot";
+    colgroup.appendChild(col);
+  }
+
+  function scoreOf(shots){
+    let s = 0;
+    for(const v of shots){ if(v === 1) s++; }
+    return s;
+  }
+
+  function shotsTakenOf(shots){
+    let n = 0;
+    for(const v of shots){ if(v === 1 || v === 0) n++; }
+    return n;
+  }
+
+  function dotHtml(v){
+    if(v === 1) return '<span class="dot hit"></span>';
+    if(v === 0) return '<span class="dot miss"></span>';
+    return '<span class="dot pending"></span>'; // null / brak strzału
+  }
+
+  function podiumClass(pos){
+    if(pos === 1) return " top-1";
+    if(pos === 2) return " top-2";
+    if(pos === 3) return " top-3";
+    return "";
+  }
+
+  function render(shooters){
+    const tbody = document.getElementById("scoreBody");
+
+    if(!Array.isArray(shooters) || shooters.length === 0){
+      tbody.innerHTML = '<tr><td colspan="' + (3+MAX_TARGETS) + '" class="empty-state">Brak danych zawodników.</td></tr>';
+      return;
+    }
+
+    // Klasyfikacja: malejąco wg liczby trafień; przy remisie rosnąco wg numeru zawodnika (niższy numer wyżej)
+    const ranked = shooters.slice().sort((a, b) => {
+      const sb = scoreOf(b.shots || []);
+      const sa = scoreOf(a.shots || []);
+      if(sb !== sa) return sb - sa;
+      return (a.shooterNumber || 0) - (b.shooterNumber || 0);
+    }).slice(0, MAX_ROWS);
+
+    let html = "";
+    ranked.forEach((shooter, idx) => {
+      const pos = idx + 1;
+      const shots = shooter.shots || [];
+      const score = scoreOf(shots);
+      const taken = shotsTakenOf(shots);
+
+      const podium = podiumClass(pos);
+      const stripe = podium ? "" : (idx % 2 === 0 ? " stripe-a" : " stripe-b");
+      const cellExtra = podium || stripe;
+
+      let rowHtml = '<tr class="row-normal">';
+      rowHtml += '<td class="cell-pos' + cellExtra + '">' + pos + '</td>';
+      rowHtml += '<td class="cell-name' + cellExtra + '">' + escapeHtml(shooter.shooterName || ("Strzelec_" + shooter.shooterNumber)) + '</td>';
+      rowHtml += '<td class="cell-score' + cellExtra + '">' + score + ' / ' + MAX_TARGETS + '</td>';
+
+      for(let i=0;i<MAX_TARGETS;i++){
+        const v = (i < shots.length) ? shots[i] : null;
+        rowHtml += '<td class="cell-shot">' + dotHtml(v) + '</td>';
+      }
+
+      rowHtml += '</tr>';
+      html += rowHtml;
+    });
+
+    tbody.innerHTML = html;
+  }
+
+  function escapeHtml(str){
+    return String(str)
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;");
+  }
+
+  async function loadData(){
+    try{
+      const res = await fetch(DATA_URL + "?t=" + Date.now(), { cache: "no-store" });
+      if(!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      render(data);
+      document.getElementById("lastUpdate").textContent =
+        new Date().toLocaleTimeString("pl-PL");
+    }catch(err){
+      console.error("Błąd wczytywania wyniki.json:", err);
+      document.getElementById("lastUpdate").textContent = "błąd odczytu (" + new Date().toLocaleTimeString("pl-PL") + ")";
+    }
+  }
+
+  loadData();
+  setInterval(loadData, REFRESH_MS);
+
+})();
+</script>
+
 </body>
 </html>

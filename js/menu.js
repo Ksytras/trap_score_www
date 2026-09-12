@@ -51,7 +51,7 @@ function getAppState() {
  * Najpierw ukrywa wszystkie główne widoki, a następnie pokazuje
  * wyłącznie widok należący do wskazanego stanu.
  */
-function setAppState(state, options = {}) {
+function setAppState(state) {
 
   if (!APP_STATE_VALUES.includes(state)) {
 
@@ -118,7 +118,7 @@ function setAppState(state, options = {}) {
 
   if (buttons) {
 
-    buttons.style.display = 'none';
+    buttons.classList.remove('show-buttons');
   }
 
   /* Pokazujemy wyłącznie widok należący do nowego stanu. */
@@ -183,6 +183,7 @@ function setAppState(state, options = {}) {
           'aria-disabled',
           String(controlsLocked)
         );
+        buttons.classList.add('show-buttons');
       }
 
       break;
