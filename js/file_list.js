@@ -1,505 +1,323 @@
 /*
  * ============================================================
- * FILE LIST
+ * LISTA ZAPISANYCH RUND
  * ============================================================
  *
- * Obsługa listy zapisanych rund z katalogu:
+ * Kontrakt przejść:
  *
- *   /wyniki/
+ * JUDGE_MENU -> ROUND_OPERATIONS / RESTORE_ROUND — pokazanie listy,
+ * RESTORE_ROUND -> JUDGE_MENU — anulowanie lub błąd,
+ * RESTORE_ROUND -> SHOOTING — przywrócenie rundy częściowej,
+ * RESTORE_ROUND -> ROUND_OPERATIONS — przywrócenie rundy pełnej.
  *
- * Funkcje:
- *
- *   getResultFiles()
- *   openRestoreFiles()
- *
- * Po wybraniu pliku:
- *
- *   - natychmiast blokujemy ekran,
- *   - zamykamy listę plików,
- *   - przez 1 sekundę nie można wprowadzić strzału,
- *   - dopiero potem wykonywane jest restoreScore().
- *
- * ============================================================
+ * restoreFileWindow jest dynamicznym podwidokiem stanu
+ * ROUND_OPERATIONS. Widocznością głównych widoków nadal zarządza
+ * wyłącznie setAppState().
  */
 
+let restoreFileListPending = false;
 
-/*
- * ============================================================
- * POBIERANIE LISTY PLIKÓW
- * ============================================================
- */
 
 async function getResultFiles() {
 
-  const response =
-    await fetch(API_URL, {
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      action: 'list_files'
+    })
+  });
 
-      method: 'POST',
+  const result = await response.json();
 
-      headers: {
-        'Content-Type': 'application/json'
-      },
-
-      body: JSON.stringify({
-        action: 'list_files'
-      })
-
-    });
-
-
-  const result =
-    await response.json();
-
-
-  if (
-    !response.ok ||
-    !result.success
-  ) {
+  if (!response.ok || !result.success) {
 
     throw new Error(
       result.message ||
-      'Nie udało się pobrać listy plików.'
+        'Nie udało się pobrać listy plików.'
     );
   }
 
-
-  if (
-    !Array.isArray(result.files)
-  ) {
-
-    return [];
-  }
-
-
-  return result.files;
+  return Array.isArray(result.files)
+    ? result.files
+    : [];
 }
 
 
-/*
- * ============================================================
- * OTWARCIE LISTY PLIKÓW
- * ============================================================
- */
-
 async function openRestoreFiles() {
+
+  if (
+    typeof getAppState !== 'function' ||
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
+
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
+
+    showStatus(
+      'Nie można otworzyć listy zapisanych rund.',
+      'error'
+    );
+
+    return false;
+  }
+
+  if (getAppState() !== APP_STATES.JUDGE_MENU) {
+
+    showStatus(
+      'Listę rund można otworzyć wyłącznie z MENU SĘDZIEGO.',
+      'warn'
+    );
+
+    return false;
+  }
+
+  if (restoreFileListPending) {
+
+    showStatus(
+      'Pobieranie listy rund już trwa.',
+      'warn'
+    );
+
+    return false;
+  }
+
+  restoreFileListPending = true;
+  showStatus('Pobieranie listy rund...', 'warn');
 
   try {
 
-    showStatus('', '');
-
-
-    /*
-     * Pobieramy listę zapisanych rund.
-     */
-
-    const files =
-      await getResultFiles();
-
-
-    /*
-     * Usuwamy poprzednie okno,
-     * jeżeli jeszcze istnieje.
-     */
+    const files = await getResultFiles();
 
     const oldWindow =
-      document.getElementById(
-        'restoreFileWindow'
-      );
-
+      document.getElementById('restoreFileWindow');
 
     if (oldWindow) {
 
       oldWindow.remove();
     }
 
+    const overlay = document.createElement('div');
+    overlay.id = 'restoreFileWindow';
+    overlay.dataset.locked = '0';
 
-    /*
-     * Tworzymy główne okno.
-     */
+    Object.assign(overlay.style, {
+      position: 'absolute',
+      inset: '0',
+      zIndex: '60',
+      background: 'rgba(0, 0, 0, .88)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    });
 
-    const overlay =
-      document.createElement('div');
+    const panel = document.createElement('div');
 
+    Object.assign(panel.style, {
+      width: '100%',
+      maxWidth: '600px',
+      maxHeight: '90vh',
+      overflowY: 'auto',
+      background: '#1b1b1b',
+      borderRadius: '24px',
+      padding: '20px'
+    });
 
-    overlay.id =
-      'restoreFileWindow';
+    const title = document.createElement('div');
+    title.textContent = 'WYBIERZ RUNDĘ';
 
-
-    overlay.style.position =
-      'absolute';
-
-    overlay.style.inset =
-      '0';
-
-    overlay.style.zIndex =
-      '60';
-
-    overlay.style.background =
-      'rgba(0,0,0,.88)';
-
-    overlay.style.display =
-      'flex';
-
-    overlay.style.alignItems =
-      'center';
-
-    overlay.style.justifyContent =
-      'center';
-
-    overlay.style.padding =
-      '20px';
-
-
-    /*
-     * Panel.
-     */
-
-    const panel =
-      document.createElement('div');
-
-
-    panel.style.width =
-      '100%';
-
-    panel.style.maxWidth =
-      '600px';
-
-    panel.style.maxHeight =
-      '90vh';
-
-    panel.style.overflowY =
-      'auto';
-
-    panel.style.background =
-      '#1b1b1b';
-
-    panel.style.borderRadius =
-      '24px';
-
-    panel.style.padding =
-      '20px';
-
-
-    /*
-     * Tytuł.
-     */
-
-    const title =
-      document.createElement('div');
-
-
-    title.textContent =
-      'WYBIERZ RUNDĘ';
-
-
-    title.style.fontSize =
-      '30px';
-
-    title.style.fontWeight =
-      '900';
-
-    title.style.color =
-      '#ffd966';
-
-    title.style.marginBottom =
-      '18px';
-
+    Object.assign(title.style, {
+      fontSize: '30px',
+      fontWeight: '900',
+      color: '#ffd966',
+      marginBottom: '18px'
+    });
 
     panel.appendChild(title);
 
-
-    /*
-     * ========================================================
-     * BRAK PLIKÓW
-     * ========================================================
-     */
-
     if (files.length === 0) {
 
-      const empty =
-        document.createElement('div');
+      const empty = document.createElement('div');
+      empty.textContent = 'Brak zapisanych rund.';
 
-
-      empty.textContent =
-        'Brak zapisanych rund.';
-
-
-      empty.style.fontSize =
-        '20px';
-
-      empty.style.color =
-        '#ccc';
-
-      empty.style.padding =
-        '20px 0';
-
+      Object.assign(empty.style, {
+        fontSize: '20px',
+        color: '#ccc',
+        padding: '20px 0'
+      });
 
       panel.appendChild(empty);
 
     } else {
 
-
-      /*
-       * ======================================================
-       * LISTA PLIKÓW
-       * ======================================================
-       */
-
       files.forEach(function(filename) {
 
-        const button =
-          document.createElement('button');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = String(filename);
 
+        Object.assign(button.style, {
+          width: '100%',
+          minHeight: '60px',
+          marginBottom: '10px',
+          border: 'none',
+          borderRadius: '16px',
+          background: '#3e3e3e',
+          color: '#fff',
+          fontSize: '20px',
+          fontWeight: '800',
+          cursor: 'pointer'
+        });
 
-        button.type =
-          'button';
+        button.onclick = async function() {
 
+          /* Pierwszy wybór natychmiast blokuje całe okno. */
+          if (overlay.dataset.locked === '1') {
 
-        button.textContent =
-          filename;
+            return;
+          }
 
+          overlay.dataset.locked = '1';
 
-        button.style.width =
-          '100%';
+          panel
+            .querySelectorAll('button')
+            .forEach(function(item) {
 
-        button.style.minHeight =
-          '60px';
+              item.disabled = true;
+              item.style.pointerEvents = 'none';
+              item.style.opacity = '0.5';
+            });
 
-        button.style.marginBottom =
-          '10px';
-
-        button.style.border =
-          'none';
-
-        button.style.borderRadius =
-          '16px';
-
-        button.style.background =
-          '#3e3e3e';
-
-        button.style.color =
-          '#fff';
-
-        button.style.fontSize =
-          '20px';
-
-        button.style.fontWeight =
-          '800';
-
-        button.style.cursor =
-          'pointer';
-
-
-        /*
-         * ====================================================
-         * WYBÓR PLIKU
-         * ====================================================
-         */
-
-        button.onclick =
-          function() {
-
-
-            /*
-             * Jeżeli wybór już został wykonany,
-             * ignorujemy kolejne kliknięcie.
-             */
-
-            if (
-              overlay.dataset.locked === '1'
-            ) {
-
-              return;
-            }
-
-
-            /*
-             * Natychmiast blokujemy całe okno.
-             */
-
-            overlay.dataset.locked =
-              '1';
-
-
-            /*
-             * Blokujemy wszystkie przyciski.
-             */
-
-            const allButtons =
-              panel.querySelectorAll(
-                'button'
-              );
-
-
-            allButtons.forEach(
-              function(item) {
-
-                item.disabled =
-                  true;
-
-                item.style.pointerEvents =
-                  'none';
-
-                item.style.opacity =
-                  '0.5';
-
-              }
-            );
-
-
-            /*
-             * Informacja dla sędziego.
-             */
-
-            showStatus(
-              'Przywracanie rundy...',
-              'warn'
-            );
-
-
-            /*
-             * Usuwamy okno z ekranu NATYCHMIAST.
-             */
+          if (typeof restoreScore !== 'function') {
 
             overlay.remove();
+            setAppState(APP_STATES.JUDGE_MENU);
 
-
-            /*
-             * =================================================
-             * BLOKADA EKRANU NA 1 SEKUNDĘ
-             * =================================================
-             *
-             * Ustawiamy również globalną blokadę
-             * dla sendShot().
-             */
-
-            if (
-              typeof scoreState !== 'undefined'
-            ) {
-
-              scoreState.locked =
-                true;
-            }
-
-
-            /*
-             * Po jednej sekundzie dopiero
-             * odczytujemy wybrany plik.
-             */
-
-            setTimeout(
-              function() {
-
-                restoreScore(
-                  filename
-                );
-
-              },
-              1000
+            showStatus(
+              'Brak funkcji przywracania rundy.',
+              'error'
             );
 
-          };
+            return;
+          }
 
+          /*
+           * restoreScore() sam ustawia blokadę scoreState. Nie stosujemy
+           * już sztucznego opóźnienia ani osobnego setTimeout().
+           */
+          let restored;
+
+          try {
+
+            restored = await restoreScore(
+              String(filename)
+            );
+
+          } catch (error) {
+
+            console.error(
+              'Błąd wyboru rundy:',
+              error
+            );
+
+            overlay.remove();
+            setAppState(APP_STATES.JUDGE_MENU);
+
+            showStatus(
+              error.message ||
+                'Nie udało się przywrócić rundy.',
+              'error'
+            );
+
+            return;
+          }
+
+          overlay.remove();
+
+          if (restored !== true) {
+
+            setAppState(APP_STATES.JUDGE_MENU);
+            return;
+          }
+
+          /*
+           * Runda pełna pozostaje w ROUND_OPERATIONS. Ponowne ustawienie
+           * stanu po usunięciu podwidoku pokazuje właściwy ekran końcowy.
+           */
+          if (
+            getAppState() ===
+              APP_STATES.ROUND_OPERATIONS
+          ) {
+
+            setAppState(
+              APP_STATES.ROUND_OPERATIONS
+            );
+          }
+        };
 
         panel.appendChild(button);
-
       });
-
     }
 
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.textContent = 'ANULUJ';
 
-    /*
-     * ========================================================
-     * PRZYCISK ANULUJ
-     * ========================================================
-     */
+    Object.assign(closeButton.style, {
+      width: '100%',
+      minHeight: '60px',
+      marginTop: '8px',
+      border: 'none',
+      borderRadius: '16px',
+      background: '#2d5a88',
+      color: '#fff',
+      fontSize: '20px',
+      fontWeight: '900'
+    });
 
-    const closeButton =
-      document.createElement('button');
+    closeButton.onclick = function() {
 
+      if (overlay.dataset.locked === '1') {
 
-    closeButton.type =
-      'button';
+        return;
+      }
 
+      overlay.remove();
+      setAppState(APP_STATES.JUDGE_MENU);
+    };
 
-    closeButton.textContent =
-      'ANULUJ';
+    panel.appendChild(closeButton);
+    overlay.appendChild(panel);
 
+    const app = document.getElementById('app');
 
-    closeButton.style.width =
-      '100%';
+    if (!app) {
 
-    closeButton.style.minHeight =
-      '60px';
-
-    closeButton.style.marginTop =
-      '8px';
-
-    closeButton.style.border =
-      'none';
-
-    closeButton.style.borderRadius =
-      '16px';
-
-    closeButton.style.background =
-      '#2d5a88';
-
-    closeButton.style.color =
-      '#fff';
-
-    closeButton.style.fontSize =
-      '20px';
-
-    closeButton.style.fontWeight =
-      '900';
-
-
-    closeButton.onclick =
-      function() {
-
-        overlay.remove();
-
-      };
-
-
-    panel.appendChild(
-      closeButton
-    );
-
-
-    /*
-     * Dodajemy panel do overlay.
-     */
-
-    overlay.appendChild(
-      panel
-    );
-
-
-    /*
-     * Dodajemy overlay do .card.
-     */
-
-    const card =
-      document.querySelector(
-        '.card'
-      );
-
-
-    if (card) {
-
-      card.appendChild(
-        overlay
-      );
-
-    } else {
-
-      document.body.appendChild(
-        overlay
-      );
-
+      throw new Error('Brak elementu app.');
     }
 
+    /*
+     * Najpierw dodajemy dynamiczny podwidok do DOM. Dzięki temu
+     * setAppState() nie pokaże pod nim ekranu zakończonej rundy.
+     */
+    app.appendChild(overlay);
+
+    if (!setAppState(APP_STATES.ROUND_OPERATIONS)) {
+
+      overlay.remove();
+
+      throw new Error(
+        'Nie udało się otworzyć listy zapisanych rund.'
+      );
+    }
+
+    showStatus('', '');
+    return true;
 
   } catch (error) {
 
@@ -508,13 +326,18 @@ async function openRestoreFiles() {
       error
     );
 
+    setAppState(APP_STATES.JUDGE_MENU);
 
     showStatus(
       error.message ||
-      'Nie udało się pobrać listy plików.',
+        'Nie udało się pobrać listy plików.',
       'error'
     );
 
-  }
+    return false;
 
+  } finally {
+
+    restoreFileListPending = false;
+  }
 }

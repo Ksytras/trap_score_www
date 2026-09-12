@@ -1,191 +1,176 @@
 /*
  * ============================================================
- * RESTORE POINT - COFNIĘCIE OSTATNIEGO STRZAŁU
+ * COFNIĘCIE OSTATNIEGO STRZAŁU
  * ============================================================
  *
- * Funkcja:
+ * Kontrakt przejścia:
  *
- *   restorePoint()
+ * - JUDGE_MENU / ROUND_OPERATIONS -> cofnięcie ostatniego strzału,
+ * - zapis strzału w toku          -> bez zmiany stanu + ostrzeżenie,
+ * - odrzucenie przez API          -> powrót do stanu wywołania,
+ * - poprawne cofnięcie            -> aktualizacja scoreState + SHOOTING,
+ * - błąd sieciowy                 -> powrót do stanu wywołania.
  *
- * Działanie:
- *
- *   1. Sędzia naciska "COFNIJ OSTATNI STRZAŁ"
- *   2. JavaScript pyta PHP o cofnięcie ostatniego wyniku
- *   3. PHP ustawia odpowiedni element shots[] na null
- *   4. PHP zwraca poprzedni stan strzelania
- *   5. Wracamy do właściwego zawodnika i numeru strzału
- *
- * Jeżeli nie ma jeszcze żadnych wyników:
- *
- *   "Cofnięcie niemożliwe - brak wyników"
- *
- * ============================================================
+ * Komunikaty tej operacji są wyświetlane na środku aplikacji:
+ * ostrzeżenie — żółte, błąd — czerwony, potwierdzenie — zielone.
  */
+
+let restorePointPending = false;
 
 
 async function restorePoint() {
 
-  /*
-   * Najpierw zamykamy MENU SĘDZIEGO.
-   */
+  if (
+    typeof getAppState !== 'function' ||
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
 
-  const menuOverlay =
-    document.getElementById('menuOverlay');
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
 
-  if (menuOverlay) {
+    showOperationMessage(
+      'Nie można ustalić stanu aplikacji.',
+      'error'
+    );
 
-    menuOverlay.classList.remove('show');
-
+    return;
   }
 
+  const currentState = getAppState();
 
-  /*
-   * Zabezpieczenie:
-   * jeżeli trwa blokada po oddanym strzale,
-   * nie pozwalamy cofać wyniku.
-   */
+  if (
+    currentState !== APP_STATES.JUDGE_MENU &&
+    currentState !== APP_STATES.ROUND_OPERATIONS
+  ) {
 
+    showOperationMessage(
+      'Cofnięcie strzału jest dostępne z MENU SĘDZIEGO lub po zakończeniu rundy.',
+      'warn'
+    );
+
+    return;
+  }
+
+  /* Zapis bieżącego strzału musi zakończyć się przed cofnięciem. */
   if (
     typeof scoreState !== 'undefined' &&
     scoreState.locked
   ) {
 
-    showStatus(
+    showOperationMessage(
       'Poczekaj na zakończenie zapisu strzału.',
       'warn'
     );
 
     return;
-
   }
 
+  if (restorePointPending) {
 
-  /*
-   * Wysyłamy żądanie do PHP.
-   */
+    showOperationMessage(
+      'Cofanie ostatniego strzału już trwa.',
+      'warn'
+    );
+
+    return;
+  }
+
+  if (typeof scoreState === 'undefined') {
+
+    showOperationMessage(
+      'Brak aktywnego stanu rundy.',
+      'error'
+    );
+
+    return;
+  }
+
+  restorePointPending = true;
 
   try {
 
-    const response =
-      await fetch(API_URL, {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: 'restore_point'
+      })
+    });
 
-        method: 'POST',
+    const result = await response.json();
 
-        headers: {
-          'Content-Type': 'application/json'
-        },
+    if (!response.ok || !result.success) {
 
-        body: JSON.stringify({
+      /* Odrzucenie operacji zachowuje stan, z którego ją wywołano. */
+      setAppState(currentState);
 
-          action: 'restore_point'
-
-        })
-
-      });
-
-
-    /*
-     * Odczytujemy odpowiedź.
-     */
-
-    const result =
-      await response.json();
-
-
-    /*
-     * Sprawdzamy poprawność odpowiedzi.
-     */
-
-    if (
-      !response.ok ||
-      !result.success
-    ) {
-
-      /*
-       * Brak wyników nie jest błędem technicznym.
-       * Wyświetlamy komunikat zwrócony przez PHP.
-       */
-
-      showStatus(
-
+      showOperationMessage(
         result.message ||
-        'Nie można cofnąć ostatniego strzału.',
-
+          'Nie można cofnąć ostatniego strzału.',
         'warn'
-
       );
 
       return;
-
     }
-
-
-    /*
-     * ========================================================
-     * COFNIĘCIE POWIODŁO SIĘ
-     * ========================================================
-     */
-
-    /*
-     * Ustawiamy stan score na cofnięty strzał.
-     */
 
     if (
-      typeof scoreState !== 'undefined'
+      typeof result.shooterIndex !== 'number' ||
+      typeof result.shotNumber !== 'number' ||
+      !result.shooter
     ) {
 
-      scoreState.shooterIndex =
-        result.shooterIndex;
-
-      scoreState.shotNumber =
-        result.shotNumber;
-
-      scoreState.locked =
-        false;
-
-    }
-
-
-    /*
-     * Pokazujemy ponownie przyciski TRAFIONY / PUDŁO.
-     */
-
-    const buttons =
-      document.getElementById('buttons');
-
-    if (buttons) {
-
-      buttons.style.display =
-        'grid';
-
-    }
-
-
-    /*
-     * Wyświetlamy zawodnika,
-     * którego strzał został cofnięty.
-     */
-
-    if (
-      result.shooter
-    ) {
-
-      displayCurrentShooter(
-        result.shooter
+      throw new Error(
+        'Serwer zwrócił niepełny stan cofniętego strzału.'
       );
-
     }
 
+    scoreState.shooterIndex = result.shooterIndex;
+    scoreState.shotNumber = result.shotNumber;
+    scoreState.locked = false;
+
+    if (typeof displayCurrentShooter !== 'function') {
+
+      throw new Error(
+        'Brak funkcji wyświetlającej zawodnika.'
+      );
+    }
+
+    displayCurrentShooter(result.shooter);
+
+    if (!setAppState(APP_STATES.SHOOTING)) {
+
+      throw new Error(
+        'Nie udało się wrócić do widoku strzelania.'
+      );
+    }
 
     /*
-     * Komunikat zielony.
+     * Wymuszamy aktywność także po zakończeniu przejścia stanu. Usuwa to
+     * disabled oraz ewentualne pointer-events odziedziczone po blokadzie.
      */
+    const hitButton = document.getElementById('hitBtn');
+    const missButton = document.getElementById('missBtn');
 
-    showStatus(
+    [hitButton, missButton].forEach(function(button) {
+
+      if (!button) {
+
+        return;
+      }
+
+      button.disabled = false;
+      button.style.pointerEvents = 'auto';
+      button.setAttribute('aria-disabled', 'false');
+    });
+
+    showOperationMessage(
       'Ostatni wynik został skasowany.',
       'ok'
     );
-
 
   } catch (error) {
 
@@ -194,16 +179,17 @@ async function restorePoint() {
       error
     );
 
+    /* Błąd techniczny przywraca stan, z którego wywołano operację. */
+    setAppState(currentState);
 
-    showStatus(
-
+    showOperationMessage(
       error.message ||
-      'Nie udało się cofnąć ostatniego strzału.',
-
+        'Nie udało się cofnąć ostatniego strzału.',
       'error'
-
     );
 
-  }
+  } finally {
 
+    restorePointPending = false;
+  }
 }

@@ -29,6 +29,13 @@
  * może być ustawione przez file_list.js podczas
  * przywracania rundy.
  *
+ * Kontrakt stanu:
+ *
+ *   - strzał można zapisać wyłącznie w stanie SHOOTING,
+ *   - ostatni strzał przełącza aplikację przez finishRound()
+ *     do stanu ROUND_OPERATIONS,
+ *   - ten moduł nie steruje bezpośrednio widocznością głównych widoków.
+ *
  * ============================================================
  */
 
@@ -44,10 +51,41 @@ async function sendShot(result) {
 
   /*
    * ==========================================================
+   * KONTROLA STANU APLIKACJI
+   * ==========================================================
+   */
+
+  if (
+    typeof getAppState !== 'function' ||
+    typeof APP_STATES === 'undefined' ||
+    typeof showOperationMessage !== 'function' ||
+    typeof clearOperationMessage !== 'function'
+  ) {
+
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
+
+    return;
+  }
+
+
+  if (getAppState() !== APP_STATES.SHOOTING) {
+
+    console.warn(
+      'Strzał można zapisać wyłącznie w stanie SHOOTING.'
+    );
+
+    return;
+  }
+
+
+  /*
+   * ==========================================================
    * BLOKADA
    * ==========================================================
    *
-   * To musi być pierwszy warunek.
+   * To musi być pierwszy warunek po potwierdzeniu stanu SHOOTING.
    *
    * Dzięki temu kliknięcie ekranu w czasie przywracania
    * rundy NIE zapisze wyniku.
@@ -110,6 +148,8 @@ async function sendShot(result) {
   scoreState.locked =
     true;
 
+  const shotStartedAt = Date.now();
+
 
   /*
    * Pobieramy przyciski.
@@ -156,9 +196,10 @@ async function sendShot(result) {
       : 'PUDŁO';
 
 
-  showStatus(
+  showOperationMessage(
     resultText,
-    'warn'
+    'warn',
+    0
   );
 
 
@@ -250,9 +291,11 @@ async function sendShot(result) {
       !apiResult.success
     ) {
 
-      showStatus(
+      clearOperationMessage();
+
+      showOperationMessage(
         apiResult.message ||
-        'Nie udało się zapisać wyniku.',
+          'Nie udało się zapisać wyniku.',
         'error'
       );
 
@@ -285,6 +328,21 @@ async function sendShot(result) {
 
 
     /*
+     * Komunikat TRAFIONY / PUDŁO oraz bieżący zawodnik pozostają
+     * na ekranie przez pełny czas blokady liczony od kliknięcia.
+     */
+    const elapsedTime = Date.now() - shotStartedAt;
+    const remainingTime = Math.max(0, 2000 - elapsedTime);
+
+    if (remainingTime > 0) {
+
+      await sleep(remainingTime);
+    }
+
+    clearOperationMessage();
+
+
+    /*
      * ========================================================
      * RUNDA ZAKOŃCZONA
      * ========================================================
@@ -296,8 +354,13 @@ async function sendShot(result) {
 
 
       /*
-       * Przyciski pozostają zablokowane.
+       * Przyciski DOM pozostają nieaktywne na ekranie końcowym, ale
+       * zwalniamy blokadę operacji. Dzięki temu po otwarciu MENU SĘDZIEGO
+       * można użyć funkcji COFNIJ OSTATNI STRZAŁ.
        */
+
+      scoreState.locked =
+        false;
 
       if (hitBtn) {
 
@@ -313,25 +376,47 @@ async function sendShot(result) {
       }
 
 
-      /*
-       * Komunikat końcowy.
-       */
+      if (apiResult.maxShot !== undefined) {
 
-      showStatus(
-        'Runda kompletna.',
-        'ok'
-      );
+        const returnedMaxShot =
+          Number(apiResult.maxShot);
 
 
-      /*
-       * Pokazujemy ekran zakończenia,
-       * jeżeli istnieje.
-       */
+        if (
+          Number.isInteger(returnedMaxShot) &&
+          returnedMaxShot > 0
+        ) {
 
-      const roundFinish =
-        document.getElementById(
-          'roundFinish'
+          scoreState.maxShot =
+            returnedMaxShot;
+        }
+      }
+
+
+      if (typeof finishRound !== 'function') {
+
+        console.error(
+          'Brak funkcji finishRound().'
         );
+
+        showOperationMessage(
+          'Runda została zapisana, ale nie udało się otworzyć ekranu zakończenia.',
+          'error'
+        );
+
+        return;
+      }
+
+
+      if (!finishRound()) {
+
+        showOperationMessage(
+          'Runda została zapisana, ale nie udało się przejść do operacji rundy.',
+          'error'
+        );
+
+        return;
+      }
 
 
       const finishMessage =
@@ -347,12 +432,10 @@ async function sendShot(result) {
       }
 
 
-      if (roundFinish) {
-
-        roundFinish.classList.add(
-          'show'
-        );
-      }
+      showStatus(
+        'Runda kompletna.',
+        'ok'
+      );
 
 
       return;
@@ -365,18 +448,14 @@ async function sendShot(result) {
      * ========================================================
      */
 
-    if (
-      typeof apiResult.nextShooterIndex === 'number'
-    ) {
+    if (typeof apiResult.nextShooterIndex === 'number') {
 
       scoreState.shooterIndex =
         apiResult.nextShooterIndex;
     }
 
 
-    if (
-      typeof apiResult.nextShotNumber === 'number'
-    ) {
+    if (typeof apiResult.nextShotNumber === 'number') {
 
       scoreState.shotNumber =
         apiResult.nextShotNumber;
@@ -398,29 +477,6 @@ async function sendShot(result) {
         apiResult.nextShooter
       );
     }
-
-
-    /*
-     * ========================================================
-     * KRÓTKA BLOKADA PO STRZALE
-     * ========================================================
-     *
-     * 2 sekundy.
-     *
-     * W tym czasie nie można kliknąć ponownie.
-     */
-
-    await sleep(2000);
-
-
-    /*
-     * Usuwamy komunikat TRAFIONY/PUDŁO.
-     */
-
-    showStatus(
-      '',
-      ''
-    );
 
 
     /*
@@ -457,9 +513,11 @@ async function sendShot(result) {
      * Pokazujemy błąd.
      */
 
-    showStatus(
+    clearOperationMessage();
+
+    showOperationMessage(
       error.message ||
-      'Błąd połączenia z API.',
+        'Błąd połączenia z API.',
       'error'
     );
 

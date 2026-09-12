@@ -1,258 +1,257 @@
 /*
  * ============================================================
- * RESTORE SCORE
+ * PRZYWRACANIE ZAPISANEJ RUNDY
  * ============================================================
  *
- * Przywracanie rundy z wybranego pliku:
+ * Kontrakt przejść:
  *
- *   /wyniki/
+ * - runda częściowa   -> SHOOTING,
+ * - runda zakończona  -> ROUND_OPERATIONS przez finishRound(),
+ * - odrzucenie API    -> JUDGE_MENU,
+ * - błąd techniczny   -> JUDGE_MENU.
  *
- * Funkcja:
- *
- *   restoreScore(filename)
- *
- * ============================================================
+ * Widocznością głównych widoków zarządza wyłącznie setAppState().
  */
+
+let restoreScorePending = false;
+
 
 async function restoreScore(filename) {
 
-  /*
-   * Sprawdzamy nazwę pliku.
-   */
+  if (
+    typeof getAppState !== 'function' ||
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined' ||
+    typeof showOperationMessage !== 'function' ||
+    typeof sleep !== 'function'
+  ) {
 
-  if (!filename) {
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
+
+    showStatus(
+      'Nie można ustalić stanu aplikacji.',
+      'error'
+    );
+
+    return false;
+  }
+
+  const currentState = getAppState();
+
+  if (
+    currentState !== APP_STATES.JUDGE_MENU &&
+    currentState !== APP_STATES.ROUND_OPERATIONS
+  ) {
+
+    showStatus(
+      'Przywracanie rundy jest dostępne wyłącznie z MENU SĘDZIEGO.',
+      'warn'
+    );
+
+    return false;
+  }
+
+  if (
+    typeof filename !== 'string' ||
+    filename.trim() === ''
+  ) {
+
+    setAppState(APP_STATES.JUDGE_MENU);
 
     showStatus(
       'Brak nazwy pliku.',
       'error'
     );
 
-    return;
+    return false;
   }
 
-
-  try {
-
-    /*
-     * Informacja dla sędziego.
-     */
+  if (restoreScorePending) {
 
     showStatus(
-      'Przywracanie rundy...',
+      'Przywracanie rundy już trwa.',
       'warn'
     );
 
+    return false;
+  }
 
-    /*
-     * Wysyłamy żądanie do API.
-     */
+  if (typeof scoreState === 'undefined') {
 
-    const response =
-      await fetch(API_URL, {
+    setAppState(APP_STATES.JUDGE_MENU);
 
-        method: 'POST',
-
-        headers: {
-          'Content-Type': 'application/json'
-        },
-
-        body: JSON.stringify({
-
-          action: 'restore_score',
-
-          filename: filename
-
-        })
-
-      });
-
-
-    /*
-     * Odczytujemy odpowiedź API.
-     */
-
-    const result =
-      await response.json();
-
-
-    console.log(
-      'restore_score:',
-      result
+    showStatus(
+      'Brak aktywnego stanu wyników.',
+      'error'
     );
 
+    return false;
+  }
 
-    /*
-     * Błąd HTTP lub błąd API.
-     */
+  restoreScorePending = true;
+  scoreState.locked = true;
 
-    if (
-      !response.ok ||
-      !result.success
-    ) {
+  showOperationMessage(
+    'Przywracanie rundy...',
+    'warn',
+    0
+  );
 
-      showStatus(
-        result.message ||
-        'Nie udało się przywrócić rundy.',
-        'error'
-      );
+  try {
 
-      return;
-    }
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: 'restore_score',
+        filename: filename.trim()
+      })
+    });
 
+    const result = await response.json();
 
-    /*
-     * ========================================================
-     * AKTUALIZACJA STANU RUNDY
-     * ========================================================
-     */
-
-    if (
-      typeof scoreState !== 'undefined'
-    ) {
-
-      /*
-       * Runda częściowa.
-       *
-       * API zwraca miejsce pierwszego
-       * brakującego wyniku.
-       */
-
-      if (
-        typeof result.shooterIndex === 'number'
-      ) {
-
-        scoreState.shooterIndex =
-          result.shooterIndex;
-      }
-
-
-      if (
-        typeof result.shotNumber === 'number'
-      ) {
-
-        scoreState.shotNumber =
-          result.shotNumber;
-      }
-
+    if (!response.ok || !result.success) {
 
       scoreState.locked = false;
+      setAppState(APP_STATES.JUDGE_MENU);
+
+      showOperationMessage(
+        result.message ||
+          'Nie udało się przywrócić rundy.',
+        'warn'
+      );
+
+      return false;
     }
 
+    if (result.maxShot !== undefined) {
 
-    /*
-     * ========================================================
-     * RUNDA PEŁNA
-     * ========================================================
-     */
+      const returnedMaxShot = Number(result.maxShot);
 
-    if (
-      result.roundFinished === true
-    ) {
+      if (
+        !Number.isInteger(returnedMaxShot) ||
+        returnedMaxShot < 1
+      ) {
 
-      /*
-       * Nie pokazujemy przycisków strzałów,
-       * ponieważ nie ma już wolnego miejsca.
-       */
-
-      const buttons =
-        document.getElementById('buttons');
-
-      if (buttons) {
-
-        buttons.style.display =
-          'none';
+        throw new Error(
+          'Serwer zwrócił nieprawidłową liczbę strzałów.'
+        );
       }
 
+      scoreState.maxShot = returnedMaxShot;
+    }
 
-      /*
-       * Czyścimy dane zawodnika.
-       */
+    if (result.roundFinished === true) {
 
-      const name =
-        document.getElementById('name');
+      if (typeof finishRound !== 'function') {
 
-      const club =
-        document.getElementById('club');
-
-      const shot =
-        document.getElementById('shot');
-
-      if (name) {
-        name.textContent = '';
+        throw new Error(
+          'Brak funkcji finishRound().'
+        );
       }
 
-      if (club) {
-        club.textContent = '';
+      /* Zakończona runda nie może przyjmować kolejnych strzałów. */
+      scoreState.locked = true;
+
+      if (!finishRound()) {
+
+        throw new Error(
+          'Nie udało się otworzyć widoku zakończonej rundy.'
+        );
       }
 
-      if (shot) {
-        shot.textContent = '';
+      const finishMessage =
+        document.getElementById('finishMessage');
+
+      if (finishMessage) {
+
+        finishMessage.textContent =
+          'Przywrócona runda jest kompletna.';
       }
 
-
-      /*
-       * Runda jest kompletna.
-       */
-
-      showStatus(
-        'Runda kompletna.',
+      showOperationMessage(
+        'Przywrócono zakończoną rundę.',
         'ok'
       );
 
-
-      return;
+      return true;
     }
 
-
-    /*
-     * ========================================================
-     * RUNDA CZĘŚCIOWA
-     * ========================================================
-     */
-
-    /*
-     * Wyświetlamy zawodnika,
-     * którego kolej przypada jako następna.
-     */
-
     if (
-      result.shooter &&
-      typeof displayCurrentShooter === 'function'
+      typeof result.shooterIndex !== 'number' ||
+      typeof result.shotNumber !== 'number' ||
+      !result.shooter
     ) {
 
-      displayCurrentShooter(
-        result.shooter
+      throw new Error(
+        'Serwer zwrócił niepełny stan przywracanej rundy.'
       );
     }
 
+    if (typeof displayCurrentShooter !== 'function') {
 
-    /*
-     * Pokazujemy przyciski
-     * TRAFIONY / PUDŁO.
-     */
-
-    const buttons =
-      document.getElementById('buttons');
-
-    if (buttons) {
-
-      buttons.style.display =
-        'grid';
+      throw new Error(
+        'Brak funkcji wyświetlającej zawodnika.'
+      );
     }
 
+    scoreState.shooterIndex = result.shooterIndex;
+    scoreState.shotNumber = result.shotNumber;
 
-    /*
-     * Informacja po przywróceniu.
-     *
-     * Zostanie wyczyszczona przy oddaniu
-     * następnego strzału.
-     */
+    const hitButton = document.getElementById('hitBtn');
+    const missButton = document.getElementById('missBtn');
 
-    showStatus(
+    if (hitButton) {
+
+      hitButton.disabled = true;
+    }
+
+    if (missButton) {
+
+      missButton.disabled = true;
+    }
+
+    displayCurrentShooter(result.shooter);
+
+    if (!setAppState(
+      APP_STATES.SHOOTING,
+      { controlsLocked: true }
+    )) {
+
+      throw new Error(
+        'Nie udało się wrócić do widoku strzelania.'
+      );
+    }
+
+    showOperationMessage(
       'Runda przywrócona.',
-      'ok'
+      'ok',
+      1500
     );
 
+    /*
+     * Krótka blokada zapobiega przypadkowemu zapisaniu strzału kliknięciem,
+     * które zakończyło wybór pliku. Po niej runda jest w pełni aktywna.
+     */
+    await sleep(1000);
+
+    scoreState.locked = false;
+
+    if (hitButton) {
+
+      hitButton.disabled = false;
+    }
+
+    if (missButton) {
+
+      missButton.disabled = false;
+    }
+
+    return true;
 
   } catch (error) {
 
@@ -261,11 +260,19 @@ async function restoreScore(filename) {
       error
     );
 
+    scoreState.locked = false;
+    setAppState(APP_STATES.JUDGE_MENU);
 
-    showStatus(
+    showOperationMessage(
       error.message ||
-      'Nie udało się przywrócić rundy.',
+        'Nie udało się przywrócić rundy.',
       'error'
     );
+
+    return false;
+
+  } finally {
+
+    restoreScorePending = false;
   }
 }
