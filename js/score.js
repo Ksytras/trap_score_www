@@ -145,21 +145,6 @@ async function score() {
       false;
 
 
-    /* Nowa lub ponownie wczytana aktywna runda odblokowuje sterowanie. */
-    const hitButton = document.getElementById('hitBtn');
-    const missButton = document.getElementById('missBtn');
-
-    if (hitButton) {
-
-      hitButton.disabled = false;
-    }
-
-    if (missButton) {
-
-      missButton.disabled = false;
-    }
-
-
     /*
      * Kontrola poprawności maxShot.
      */

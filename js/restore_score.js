@@ -21,9 +21,7 @@ async function restoreScore(filename) {
   if (
     typeof getAppState !== 'function' ||
     typeof setAppState !== 'function' ||
-    typeof APP_STATES === 'undefined' ||
-    typeof showOperationMessage !== 'function' ||
-    typeof sleep !== 'function'
+    typeof APP_STATES === 'undefined'
   ) {
 
     console.error(
@@ -93,10 +91,9 @@ async function restoreScore(filename) {
   restoreScorePending = true;
   scoreState.locked = true;
 
-  showOperationMessage(
+  showStatus(
     'Przywracanie rundy...',
-    'warn',
-    0
+    'warn'
   );
 
   try {
@@ -119,7 +116,7 @@ async function restoreScore(filename) {
       scoreState.locked = false;
       setAppState(APP_STATES.JUDGE_MENU);
 
-      showOperationMessage(
+      showStatus(
         result.message ||
           'Nie udało się przywrócić rundy.',
         'warn'
@@ -128,22 +125,27 @@ async function restoreScore(filename) {
       return false;
     }
 
-    if (result.maxShot !== undefined) {
+    /*
+     * WAŻNE: maxShot MUSI być zawsze w odpowiedzi API.
+     * Jeśli go nie ma, zwracamy błąd.
+     */
+    if (typeof result.maxShot !== 'number') {
 
-      const returnedMaxShot = Number(result.maxShot);
-
-      if (
-        !Number.isInteger(returnedMaxShot) ||
-        returnedMaxShot < 1
-      ) {
-
-        throw new Error(
-          'Serwer zwrócił nieprawidłową liczbę strzałów.'
-        );
-      }
-
-      scoreState.maxShot = returnedMaxShot;
+      throw new Error(
+        'Serwer nie zwrócił poprawnej liczby strzałów (maxShot).'
+      );
     }
+
+    const returnedMaxShot = Number(result.maxShot);
+
+    if (!Number.isInteger(returnedMaxShot) || returnedMaxShot < 1) {
+
+      throw new Error(
+        'Serwer zwrócił nieprawidłową liczbę strzałów.'
+      );
+    }
+
+    scoreState.maxShot = returnedMaxShot;
 
     if (result.roundFinished === true) {
 
@@ -173,7 +175,7 @@ async function restoreScore(filename) {
           'Przywrócona runda jest kompletna.';
       }
 
-      showOperationMessage(
+      showStatus(
         'Przywrócono zakończoną rundę.',
         'ok'
       );
@@ -201,19 +203,7 @@ async function restoreScore(filename) {
 
     scoreState.shooterIndex = result.shooterIndex;
     scoreState.shotNumber = result.shotNumber;
-
-    const hitButton = document.getElementById('hitBtn');
-    const missButton = document.getElementById('missBtn');
-
-    if (hitButton) {
-
-      hitButton.disabled = true;
-    }
-
-    if (missButton) {
-
-      missButton.disabled = true;
-    }
+    scoreState.locked = false;
 
     displayCurrentShooter(result.shooter);
 
@@ -224,29 +214,10 @@ async function restoreScore(filename) {
       );
     }
 
-    showOperationMessage(
+    showStatus(
       'Runda przywrócona.',
-      'ok',
-      1500
+      'ok'
     );
-
-    /*
-     * Krótka blokada zapobiega przypadkowemu zapisaniu strzału kliknięciem,
-     * które zakończyło wybór pliku. Po niej runda jest w pełni aktywna.
-     */
-    await sleep(1000);
-
-    scoreState.locked = false;
-
-    if (hitButton) {
-
-      hitButton.disabled = false;
-    }
-
-    if (missButton) {
-
-      missButton.disabled = false;
-    }
 
     return true;
 
@@ -260,7 +231,7 @@ async function restoreScore(filename) {
     scoreState.locked = false;
     setAppState(APP_STATES.JUDGE_MENU);
 
-    showOperationMessage(
+    showStatus(
       error.message ||
         'Nie udało się przywrócić rundy.',
       'error'
