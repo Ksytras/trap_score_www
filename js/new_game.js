@@ -1,8 +1,16 @@
 /*
  * ============================================================
- * NEW_GAME.JS
- * Obsługa funkcji NOWA RUNDA
+ * NOWA RUNDA — STAN 3
  * ============================================================
+ *
+ * Kontrakt przejść obsługiwanych przez ten moduł:
+ *
+ * JUDGE_MENU -> NEW_ROUND — przycisk NOWA RUNDA,
+ * NEW_ROUND  -> JUDGE_MENU — przycisk ANULUJ,
+ * NEW_ROUND  -> SHOOTING — poprawne zapisanie i uruchomienie rundy.
+ *
+ * Widocznością głównych widoków zarządza wyłącznie setAppState()
+ * z menu.js. Ten plik nie dodaje ani nie usuwa klasy "show".
  */
 
 
@@ -14,17 +22,14 @@
 
 function newGame() {
 
-  const overlay =
-    document.getElementById('setupOverlay');
-
   const countInput =
     document.getElementById('shooterCount');
 
 
-  if (!overlay || !countInput) {
+  if (!countInput) {
 
     console.error(
-      'Brak elementów formularza NOWA RUNDA.'
+      'Brak pola liczby zawodników.'
     );
 
     return;
@@ -32,16 +37,18 @@ function newGame() {
 
 
   /*
-   * Zamykamy MENU SĘDZIEGO.
+   * Kontrolę widoczności przekazujemy centralnej maszynie stanów.
    */
-  const menuOverlay =
-    document.getElementById('menuOverlay');
+  if (
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
 
-  if (menuOverlay) {
-
-    menuOverlay.classList.remove(
-      'show'
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
     );
+
+    return;
   }
 
 
@@ -57,12 +64,12 @@ function newGame() {
   refreshShooterForm(true);
 
 
-  /*
-   * Otwieramy formularz NOWA RUNDA.
-   */
-  overlay.classList.add(
-    'show'
-  );
+  if (!setAppState(APP_STATES.NEW_ROUND)) {
+
+    console.error(
+      'Nie udało się otworzyć formularza NOWA RUNDA.'
+    );
+  }
 }
 
 
@@ -87,14 +94,24 @@ function closeSetup(event) {
   }
 
 
-  const overlay =
-    document.getElementById('setupOverlay');
+  if (
+    typeof setAppState !== 'function' ||
+    typeof APP_STATES === 'undefined'
+  ) {
+
+    console.error(
+      'Brak centralnej obsługi stanu aplikacji.'
+    );
+
+    return;
+  }
 
 
-  if (overlay) {
+  /* ANULUJ zawsze realizuje przejście STAN 3 -> STAN 2. */
+  if (!setAppState(APP_STATES.JUDGE_MENU)) {
 
-    overlay.classList.remove(
-      'show'
+    console.error(
+      'Nie udało się wrócić do MENU SĘDZIEGO.'
     );
   }
 }
@@ -720,23 +737,6 @@ async function saveNewRoundWithShooters() {
 
 
     /*
-     * Zamykamy formularz.
-     */
-    const overlay =
-      document.getElementById(
-        'setupOverlay'
-      );
-
-
-    if (overlay) {
-
-      overlay.classList.remove(
-        'show'
-      );
-    }
-
-
-    /*
      * Uruchamiamy SCORE.
      */
     if (
@@ -748,8 +748,31 @@ async function saveNewRoundWithShooters() {
 
     } else {
 
-      console.error(
+      throw new Error(
         'Brak funkcji score().'
+      );
+    }
+
+
+    /*
+     * Dopiero po zapisaniu rundy i odświeżeniu wyniku przechodzimy
+     * ze STANU 3 do STANU 4. setAppState() zamknie formularz i pokaże
+     * przyciski TRAFIONY / PUDŁO.
+     */
+    if (
+      typeof setAppState !== 'function' ||
+      typeof APP_STATES === 'undefined'
+    ) {
+
+      throw new Error(
+        'Brak centralnej obsługi stanu aplikacji.'
+      );
+    }
+
+    if (!setAppState(APP_STATES.SHOOTING)) {
+
+      throw new Error(
+        'Nie udało się uruchomić widoku strzelania.'
       );
     }
 
